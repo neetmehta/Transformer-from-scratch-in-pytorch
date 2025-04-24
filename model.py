@@ -113,11 +113,11 @@ class EncoderBlock(nn.Module):
         self.multi_headed_self_attention = MultiheadAttention(n_embd=n_embd, num_heads=num_heads)
         self.ffn = FeedForwardNetwork(d_model=n_embd, d_ff=d_ff, p_d=p_d)
         
-    def forward(self, x, padding_mask):
+    def forward(self, x, self_attn_mask):
         
         x_residual_1 = x
         
-        attention_out = self.dropout(self.multi_headed_self_attention(x, x, x), padding_mask)
+        attention_out = self.dropout(self.multi_headed_self_attention(x, x, x, self_attn_mask)[0])
         
         sublayer_1_out = self.layer_norm(x_residual_1 + attention_out)
         
@@ -131,19 +131,29 @@ class EncoderBlock(nn.Module):
     
 class DecoderBlock(nn.Module):
     
-    def __init__(self, n_embd, num_heads, d_ff, p_d=0.1):
+    def __init__(self, d_model, num_heads, d_ff, p_d=0.0, layer_norm_eps=1e-5, bias=True):
         super().__init__()
-        self.n_embd = n_embd
-        self.layer_norm = nn.LayerNorm(n_embd)
-        self.dropout = nn.Dropout(p_d)
-        self.masked_multi_headed_self_attention = MultiheadAttention(n_embd=n_embd, num_heads=num_heads)
-        self.multi_headed_cross_attention = MultiheadAttention(n_embd=n_embd, num_heads=num_heads)
-        self.ffn = FeedForwardNetwork(d_model=n_embd, d_ff=d_ff, p_d=p_d)
+        self.d_model = d_model
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
+        self.norm3 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
+        self.dropout1 = nn.Dropout(p_d)
+        self.dropout2 = nn.Dropout(p_d)
+        self.dropout3 = nn.Dropout(p_d)
+        self.masked_multi_headed_self_attention = MultiheadAttention(d_model=d_model, num_heads=num_heads)
+        self.multi_headed_cross_attention = MultiheadAttention(d_model=d_model, num_heads=num_heads)
+        self.ffn = FeedForwardNetwork(d_model=d_model, d_ff=d_ff, p_d=p_d)
         
-    def forward(self, x, padding_mask):
-        x_residual_1 = x
+    def forward(self, x, memory, masked_self_attn_mask, cross_attn_mask):
+        print(self.masked_multi_headed_self_attention(x, x, x, masked_self_attn_mask)[0])
+        x = self.norm1(x + self.dropout1(self.masked_multi_headed_self_attention(x, x, x, masked_self_attn_mask)[0]))
         
-        causal_mask = torch.tril(torch.ones(self.n_embd, self.n_embd))
-        mask = torch.logical_or(causal_mask, padding_mask)
+        x = self.norm2(x + self.dropout2(self.multi_headed_cross_attention(x, memory, memory, cross_attn_mask)[0]))
+        
+        x = self.norm3(x + self.dropout3(self.ffn(x)))
+        
+        return x
+        
+        
         
         
