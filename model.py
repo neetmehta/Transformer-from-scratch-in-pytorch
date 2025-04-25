@@ -178,7 +178,7 @@ class ProjectionLayer(nn.Module):
         self.projection = nn.Linear(d_model, vocab_size)
         
     def forward(self, x):
-        return self.projection(x).softmax(dim=-1)
+        return self.projection(x)
 
 class Transformer(nn.Module):
 

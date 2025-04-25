@@ -2,9 +2,9 @@
 
 class TransformerConfig:
     def __init__(self):
-        self.src_vocab_size = 58101
-        self.tgt_vocab_size = 58101
-        self.seq_len = 128
+        self.src_vocab_size = 58102
+        self.tgt_vocab_size = 58102
+        self.seq_len = 200
         self.d_model = 512
         self.num_heads = 8
         self.d_ff = 2048
