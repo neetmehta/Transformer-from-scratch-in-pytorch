@@ -73,7 +73,7 @@ class MultiheadAttention(nn.Module):
 
         if mask is not None:
             # boolean mask
-            attention_weights = attention_weights.masked_fill(mask, float('-inf'))
+            attention_weights = attention_weights.masked_fill(mask, -1e9)
 
         attention_weights = attention_weights.softmax(dim=-1)
 
@@ -189,7 +189,7 @@ class Transformer(nn.Module):
         self.projection_layer = projection_layer
 
         # Weight tying
-        self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+        # self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
         self.src_word_embedding.word_embd.weight = self.tgt_word_embedding.word_embd.weight
 
     def encode(self, src, self_attn_mask):
