@@ -138,7 +138,7 @@ class DecoderBlock(nn.Module):
         self.ffn = FeedForwardNetwork(d_model=d_model, d_ff=d_ff, p_d=p_d)
 
     def forward(self, x, memory, masked_self_attn_mask, cross_attn_mask):
-        print(self.masked_multi_headed_self_attention(x, x, x, masked_self_attn_mask)[0])
+
         x = self.norm1(x + self.dropout1(self.masked_multi_headed_self_attention(x, x, x, masked_self_attn_mask)[0]))
 
         x = self.norm2(x + self.dropout2(self.multi_headed_cross_attention(x, memory, memory, cross_attn_mask)[0]))
@@ -148,22 +148,22 @@ class DecoderBlock(nn.Module):
         return x
     
 class Encoder(nn.Module):
-    def __init__(self, layers):
+    def __init__(self, encoder_layers):
         super().__init__()
-        self.layers = layers
+        self.encoder_layers = encoder_layers
 
     def forward(self, x, mask):
-        for layer in self.layers:
+        for layer in self.encoder_layers:
             x = layer(x, mask)
         return x
     
 class Decoder(nn.Module):
-    def __init__(self, layers):
+    def __init__(self, decoder_layers):
         super().__init__()
-        self.layers = layers
+        self.decoder_layers = decoder_layers
 
     def forward(self, x, memory, masked_self_attn_mask, cross_attn_mask):
-        for layer in self.layers:
+        for layer in self.decoder_layers:
             x = layer(x, memory, masked_self_attn_mask, cross_attn_mask)
         return x
         
@@ -215,7 +215,7 @@ class Transformer(nn.Module):
         
         memory = self.encode(src, self_attn_mask)
         
-        decoder_out = self.decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask)
+        decoder_out = self.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
         
         logits = self.project(decoder_out)
         

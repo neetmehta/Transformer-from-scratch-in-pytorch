@@ -30,8 +30,8 @@ class WMTDataset(Dataset):
         src_padding_len = self.seq_len - (len(src_encoding) + 2)  
         tgt_padding_len = self.seq_len - (len(tgt_encoding) + 2) 
         
-        src_encoding = torch.tensor([sos_token] + src_encoding + [eos_token] + [pad_token]*src_padding_len, dtype=torch.uint64)
-        tgt_encoding = torch.tensor([sos_token] + tgt_encoding + [eos_token] + [pad_token]*tgt_padding_len, dtype=torch.uint64)
+        src_encoding = torch.tensor([sos_token] + src_encoding + [eos_token] + [pad_token]*src_padding_len, dtype=torch.long)
+        tgt_encoding = torch.tensor([sos_token] + tgt_encoding + [eos_token] + [pad_token]*tgt_padding_len, dtype=torch.long)
         
         causal_mask = torch.triu(torch.ones(self.seq_len, self.seq_len, dtype=bool), diagonal=1).to(bool)
 
