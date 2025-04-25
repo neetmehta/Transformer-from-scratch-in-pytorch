@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import math
 
+def generate_causal_mask(seq_len):
+    return torch.triu(torch.ones((seq_len, seq_len)), diagonal=1).unsqueeze(0).unsqueeze(1).to(bool)
+
 class WordEmbeddings(nn.Module):
 
     def __init__(self, vocab_size, d_model):
@@ -190,6 +193,7 @@ class Transformer(nn.Module):
         
     def encode(self, src, self_attn_mask):
         src = self.src_word_embedding(src)
+        
         src = self.positional_encoding(src)
         
         memory = self.encoder(src, self_attn_mask)
@@ -211,7 +215,7 @@ class Transformer(nn.Module):
 
         return logits
 
-    def forward(self, src, self_attn_mask, tgt, masked_self_attn_mask, cross_attn_mask):
+    def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
         
         memory = self.encode(src, self_attn_mask)
         

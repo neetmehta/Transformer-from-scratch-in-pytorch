@@ -32,11 +32,8 @@ class WMTDataset(Dataset):
         
         src_encoding = torch.tensor([sos_token] + src_encoding + [eos_token] + [pad_token]*src_padding_len, dtype=torch.long)
         tgt_encoding = torch.tensor([sos_token] + tgt_encoding + [eos_token] + [pad_token]*tgt_padding_len, dtype=torch.long)
-        
-        causal_mask = torch.triu(torch.ones(self.seq_len, self.seq_len, dtype=bool), diagonal=1).to(bool)
 
-        encoder_self_attention_mask = (src_encoding == pad_token).unsqueeze(0) | (src_encoding == pad_token).unsqueeze(1)
-        decoder_self_attention_mask = (tgt_encoding == pad_token).unsqueeze(0) | (tgt_encoding == pad_token).unsqueeze(1) | causal_mask
-        decoder_cross_attention_mask = (tgt_encoding == pad_token).unsqueeze(0) | (src_encoding == pad_token).unsqueeze(1)
-        
-        return src_encoding, tgt_encoding, encoder_self_attention_mask, decoder_self_attention_mask, decoder_cross_attention_mask
+        src_mask = (src_encoding == pad_token).unsqueeze(0)
+        tgt_mask = (tgt_encoding == pad_token).unsqueeze(0)
+                
+        return src_encoding, tgt_encoding, src_mask, tgt_mask
