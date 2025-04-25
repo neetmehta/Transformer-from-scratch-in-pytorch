@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import math
 
-def generate_causal_mask(seq_len):
-    return torch.triu(torch.ones((seq_len, seq_len)), diagonal=1).unsqueeze(0).unsqueeze(1).to(bool)
-
 class WordEmbeddings(nn.Module):
 
     def __init__(self, vocab_size, d_model):
@@ -40,11 +37,11 @@ class MultiheadAttention(nn.Module):
         super().__init__()
 
         self.h = num_heads
-        self.w_q = nn.Linear(d_model, d_model)
-        self.w_k = nn.Linear(d_model, d_model)
-        self.w_v = nn.Linear(d_model, d_model)
+        self.w_q = nn.Linear(d_model, d_model, bias=False)
+        self.w_k = nn.Linear(d_model, d_model, bias=False)
+        self.w_v = nn.Linear(d_model, d_model, bias=False)
 
-        self.w_o = nn.Linear(d_model, d_model)
+        self.w_o = nn.Linear(d_model, d_model, bias=False)
 
         self.d_k = d_model // num_heads
 
@@ -149,7 +146,7 @@ class DecoderBlock(nn.Module):
         x = self.norm3(x + self.dropout3(self.ffn(x)))
 
         return x
-    
+
 class Encoder(nn.Module):
     def __init__(self, encoder_layers):
         super().__init__()
@@ -159,7 +156,7 @@ class Encoder(nn.Module):
         for layer in self.encoder_layers:
             x = layer(x, mask)
         return x
-    
+
 class Decoder(nn.Module):
     def __init__(self, decoder_layers):
         super().__init__()
@@ -169,14 +166,14 @@ class Decoder(nn.Module):
         for layer in self.decoder_layers:
             x = layer(x, memory, masked_self_attn_mask, cross_attn_mask)
         return x
-        
-    
+
+
 class ProjectionLayer(nn.Module):
-    
+
     def __init__(self, d_model, vocab_size):
         super().__init__()
-        self.projection = nn.Linear(d_model, vocab_size)
-        
+        self.projection = nn.Linear(d_model, vocab_size, bias=False)
+
     def forward(self, x):
         return self.projection(x)
 
@@ -190,14 +187,18 @@ class Transformer(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.projection_layer = projection_layer
-        
+
+        # Weight tying
+        self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+        self.src_word_embedding.word_embd.weight = self.tgt_word_embedding.word_embd.weight
+
     def encode(self, src, self_attn_mask):
         src = self.src_word_embedding(src)
-        
+
         src = self.positional_encoding(src)
-        
+
         memory = self.encoder(src, self_attn_mask)
-        
+
         return memory
 
     def decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask):
@@ -208,25 +209,25 @@ class Transformer(nn.Module):
         decoder_out = self.decoder(tgt, memory, masked_self_attn_mask, cross_attn_mask)
 
         return decoder_out
-    
+
     def project(self, decoder_out):
-        
+
         logits = self.projection_layer(decoder_out)
 
         return logits
 
     def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
-        
+
         memory = self.encode(src, self_attn_mask)
-        
+
         decoder_out = self.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
-        
+
         logits = self.project(decoder_out)
-        
+
         return logits
-    
+
 def build_transformer(config):
-    
+
     # Word Embeddings
     src_word_embedding = WordEmbeddings(config.src_vocab_size, config.d_model)
     tgt_word_embedding = WordEmbeddings(config.tgt_vocab_size, config.d_model)
@@ -239,7 +240,7 @@ def build_transformer(config):
         EncoderBlock(config.d_model, config.num_heads, config.d_ff, p_d=config.dropout)
         for _ in range(config.num_encoder_layers)
     ])
-    
+
     encoder = Encoder(encoder_layers)
 
     # Stack of Decoder Layers

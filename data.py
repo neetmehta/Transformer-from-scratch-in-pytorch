@@ -22,18 +22,18 @@ class WMTDataset(Dataset):
         pad_token = self.src_tokenizer.encode(['<pad>'])[0]
         src_encoding = self.src_tokenizer.encode(self.data.iloc[index]['en'])[:-1] # remove default eos token
         tgt_encoding = self.tgt_tokenizer.encode(self.data.iloc[index]['de'])[:-1] # remove default eos token
-        print("len of src sen: ", len(src_encoding))
-        print("len of tgt sen: ", len(tgt_encoding))
+
         assert len(src_encoding) < self.seq_len + 2, "sentence too big"
-        assert len(tgt_encoding) < self.seq_len + 2, "sentence too big"
+        assert len(tgt_encoding) < self.seq_len + 1, "sentence too big"
         
         src_padding_len = self.seq_len - (len(src_encoding) + 2)  
-        tgt_padding_len = self.seq_len - (len(tgt_encoding) + 2) 
+        tgt_padding_len = self.seq_len - (len(tgt_encoding) + 1) 
         
         src_encoding = torch.tensor([sos_token] + src_encoding + [eos_token] + [pad_token]*src_padding_len, dtype=torch.long)
-        tgt_encoding = torch.tensor([sos_token] + tgt_encoding + [eos_token] + [pad_token]*tgt_padding_len, dtype=torch.long)
+        label = torch.tensor(tgt_encoding + [eos_token] + [pad_token]*tgt_padding_len, dtype=torch.long)
+        tgt_encoding = torch.tensor([sos_token] + tgt_encoding + [pad_token]*tgt_padding_len, dtype=torch.long)
 
         src_mask = (src_encoding == pad_token).unsqueeze(0)
         tgt_mask = (tgt_encoding == pad_token).unsqueeze(0)
                 
-        return src_encoding, tgt_encoding, src_mask, tgt_mask
+        return src_encoding, tgt_encoding, label, src_mask, tgt_mask
