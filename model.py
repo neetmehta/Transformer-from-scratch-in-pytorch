@@ -61,9 +61,9 @@ class MultiheadAttention(nn.Module):
         # k -> (B, seq_len, embd_dim)
         # v -> (B, seq_len, embd_dim)
 
-        queries = queries.view(B, seq_len, self.h, self.d_k).transpose(1,2)
-        keys = keys.view(B, seq_len, self.h, self.d_k).transpose(1,2)
-        values = values.view(B, seq_len, self.h, self.d_k).transpose(1,2)
+        queries = queries.view(queries.shape[0], queries.shape[1], self.h, self.d_k).transpose(1,2)
+        keys = keys.view(keys.shape[0], keys.shape[1], self.h, self.d_k).transpose(1,2)
+        values = values.view(values.shape[0], values.shape[1], self.h, self.d_k).transpose(1,2)
 
         # q -> (B, h, seq_len, dk)
         # k -> (B, h, seq_len, dk)
