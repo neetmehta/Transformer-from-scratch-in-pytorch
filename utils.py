@@ -1,10 +1,20 @@
 import torch
 import torchmetrics
 import os
+import importlib.util
+import sys
 
 import torchmetrics.text
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def load_config(config_path):
+    spec = importlib.util.spec_from_file_location("config_module", config_path)
+    config_module = importlib.util.module_from_spec(spec)
+    sys.modules["config_module"] = config_module
+    spec.loader.exec_module(config_module)
+    return config_module
 
 
 def save_checkpoint(model, optimizer, epoch, loss, path):

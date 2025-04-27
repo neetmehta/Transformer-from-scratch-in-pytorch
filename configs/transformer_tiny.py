@@ -1,7 +1,8 @@
 class Config:
     def __init__(self):
-        self.src_vocab_size = 58102
-        self.tgt_vocab_size = 58102
+        self.tokenizer = "facebook/wmt19-en-de"
+        self.src_vocab_size = 42025
+        self.tgt_vocab_size = 42025
         self.seq_len = 200
         self.d_model = 256
         self.num_heads = 8
@@ -18,5 +19,6 @@ class Config:
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
         self.num_epochs = 100
-        self.checkpoint_path = "./best_ckpt.pth"
+        self.checkpoint_path = "./best_ckpt_tiny.pth"
         self.resume = False
+        self.save_after_steps = 1000

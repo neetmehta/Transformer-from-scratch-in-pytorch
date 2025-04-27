@@ -3,8 +3,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 from tqdm import tqdm
+import argparse
 
-from configs.config import TransformerConfig, OverfitConfig
 from data import WMTDataset
 from model import build_transformer
 from utils import (
@@ -13,6 +13,7 @@ from utils import (
     load_checkpoint,
     calculate_bleu_score,
     greedy_decode,
+    load_config,
 )
 
 
@@ -40,9 +41,10 @@ def get_dataloaders(config, tokenizer):
     return train_loader, val_loader
 
 
-def train_one_epoch(model, dataloader, optimizer, criterion, config, device):
+def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, device):
     model.train()
     total_loss = 0.0
+    steps = 0
     num_batches = len(dataloader)
 
     progress_bar = tqdm(dataloader, desc="Training", leave=False)
@@ -69,14 +71,20 @@ def train_one_epoch(model, dataloader, optimizer, criterion, config, device):
 
         total_loss += loss.item()
         progress_bar.set_postfix(loss=loss.item())
+        steps += 1
+
+        if steps % config.save_after_steps == 0:
+            print(f"Saving checkpoint... \n")
+            save_checkpoint(
+                model, optimizer, epoch + 1, total_loss / steps, config.checkpoint_path
+            )
 
     return total_loss / num_batches
 
 
 def validate(model, dataloader, criterion, config, tokenizer, device):
     model.eval()
-    total_loss = 0.0
-    bleu_score = 0.0
+    total_bleu_score = 0.0
     num_batches = len(dataloader)
 
     progress_bar = tqdm(dataloader, desc="Validation", leave=False)
@@ -88,19 +96,29 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
         pad_token = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
         eos_token = tokenizer.convert_tokens_to_ids(tokenizer.eos_token)
 
-        raw_label = label[(label != pad_token) & (label != eos_token)]
+        # TODO: Remove hardcoding for eos
+        raw_label = label[(label != pad_token) & (label != 2)]
         raw_label = tokenizer.decode(raw_label.tolist())
-        bleu_score += calculate_bleu_score(raw_label, prediction, "bleu_score")
-        progress_bar.set_postfix(loss=bleu_score[-1])
+        bleu_score = calculate_bleu_score(raw_label, prediction, "bleu_score")
+        total_bleu_score += bleu_score
+        progress_bar.set_postfix(loss=bleu_score)
 
-    return bleu_score / num_batches
+    return total_bleu_score / num_batches
 
 
 def main():
-    config = OverfitConfig()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, required=True, help="Path to the config file"
+    )
+    args = parser.parse_args()
+
+    config_module = load_config(args.config)
+    config = config_module.Config()  # instantiate your Config class
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-de")
+    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer)
     tokenizer.add_special_tokens({"bos_token": "<s>"})
 
     train_loader, val_loader = get_dataloaders(config, tokenizer)
@@ -116,32 +134,35 @@ def main():
         model.parameters(), betas=config.betas, eps=config.optim_eps, lr=10**-4
     )
 
+    print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M\n")
+    print("Starting training...")
+
     if config.resume:
-        start_epoch, best_loss = load_checkpoint(
+        start_epoch, best_bleu_score = load_checkpoint(
             model, optimizer, config.checkpoint_path
         )
     else:
-        start_epoch, best_loss = 0, float("inf")
+        start_epoch, best_bleu_score = 0, 0.0
 
     for epoch in range(start_epoch, config.num_epochs):
         print(f"Epoch {epoch + 1}/{config.num_epochs}")
         avg_loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, config, device
+            model, train_loader, optimizer, criterion, config, epoch, device
         )
-        print(f"Epoch {epoch + 1} Loss: {avg_loss:.4f}")
+        print(f"Epoch {epoch + 1} Loss: {avg_loss:.4f}\n")
         print(f"Running Validation...")
         avg_bleu_score = validate(
             model, val_loader, criterion, config, tokenizer, device
         )
-        print(f"Avg. BLEU score is: {avg_bleu_score}")
-        if avg_loss < best_loss:
+        print(f"Avg. BLEU score is: {avg_bleu_score}\n")
+        if avg_bleu_score > best_bleu_score:
             print(
-                f"Saving checkpoint... (loss improved from {best_loss:.4f} to {avg_loss:.4f})"
+                f"Saving checkpoint... (BLEU score improved from {best_bleu_score:.4f} to {avg_bleu_score:.4f})\n"
             )
             save_checkpoint(
                 model, optimizer, epoch + 1, avg_loss, config.checkpoint_path
             )
-            best_loss = avg_loss
+            best_bleu_score = avg_bleu_score
 
 
 if __name__ == "__main__":
