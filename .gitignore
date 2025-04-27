@@ -1,5 +1,6 @@
 wmt14_translate_de-en_test.csv
 *.pyc
 train.py
-.vscode/launch.json
+.vscode/
 *.csv
+*.pth
