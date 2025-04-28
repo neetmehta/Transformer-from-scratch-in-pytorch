@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-
+from random import randint
 
 class WMTDataset(Dataset):
 
@@ -16,8 +16,8 @@ class WMTDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-    def __getitem__(self, index):
+    
+    def get_sample(self, index):
         sos_token = self.src_tokenizer.encode(["<s>"])[0]
         eos_token = self.src_tokenizer.encode(["</s>"])[0]
         pad_token = self.src_tokenizer.encode(["<pad>"])[0]
@@ -28,8 +28,8 @@ class WMTDataset(Dataset):
             :-1
         ]  # remove default eos token
 
-        assert len(src_encoding) < self.seq_len + 2, "sentence too big"
-        assert len(tgt_encoding) < self.seq_len + 1, "sentence too big"
+        if (len(src_encoding) > self.seq_len + 2) or (len(tgt_encoding) > self.seq_len + 1):
+            return
 
         src_padding_len = self.seq_len - (len(src_encoding) + 2)
         tgt_padding_len = self.seq_len - (len(tgt_encoding) + 1)
@@ -49,3 +49,17 @@ class WMTDataset(Dataset):
         tgt_mask = (tgt_encoding == pad_token).unsqueeze(0)
 
         return src_encoding, tgt_encoding, label, src_mask, tgt_mask
+
+
+    def __getitem__(self, index):
+        out = self.get_sample(index)
+        
+        if out is None:
+            while True:
+                index = randint(0, len(self.data))
+                out = self.get_sample(index)
+                
+                if out is not None:
+                    return self.get_sample(index)
+                
+        return out

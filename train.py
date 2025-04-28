@@ -32,10 +32,10 @@ def get_dataloaders(config, tokenizer):
     )
 
     train_loader = DataLoader(
-        train_dataset, batch_size=config.train_batch_size, shuffle=config.shuffle
+        train_dataset, batch_size=config.train_batch_size, shuffle=config.shuffle, num_workers=config.train_workers
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=config.val_batch_size, shuffle=False
+        val_dataset, batch_size=config.val_batch_size, shuffle=False, num_workers=config.val_workers
     )
 
     return train_loader, val_loader

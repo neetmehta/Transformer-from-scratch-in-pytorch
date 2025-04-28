@@ -3,7 +3,7 @@ class Config:
         self.tokenizer = "facebook/wmt19-en-de"
         self.src_vocab_size = 42025
         self.tgt_vocab_size = 42025
-        self.seq_len = 200
+        self.seq_len = 100
         self.d_model = 256
         self.num_heads = 8
         self.d_ff = 512
@@ -12,7 +12,7 @@ class Config:
         self.dropout = 0.1
         self.train_data_path = "E:\Transformer-from-scratch-in-pytorch\wmt14_translate_de-en_train.csv"
         self.val_data_path = "E:\Transformer-from-scratch-in-pytorch\wmt14_translate_de-en_validation.csv"
-        self.train_batch_size = 16
+        self.train_batch_size = 2
         self.val_batch_size = 1
         self.shuffle = True
         self.label_smoothing = 0.1
@@ -22,3 +22,5 @@ class Config:
         self.checkpoint_path = "./best_ckpt_tiny.pth"
         self.resume = False
         self.save_after_steps = 1000
+        self.train_workers = 0
+        self.val_workers = 0

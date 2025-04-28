@@ -22,3 +22,5 @@ class Config:
         self.checkpoint_path = "./best_ckpt.pth"
         self.resume = False
         self.save_after_steps = 1000
+        self.train_workers = 8
+        self.val_workers = 8
