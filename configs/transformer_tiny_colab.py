@@ -19,8 +19,8 @@ class Config:
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
         self.num_epochs = 100
-        self.checkpoint_path = "/content/drive/MyDrive"
+        self.checkpoint_path = "/content/drive/MyDrive/checkpoint.pth"
         self.resume = False
         self.save_after_steps = 1000
-        self.train_workers = 4
-        self.val_workers = 4
+        self.train_workers = 0
+        self.val_workers = 0
