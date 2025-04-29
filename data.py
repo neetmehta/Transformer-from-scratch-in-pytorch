@@ -28,7 +28,7 @@ class WMTDataset(Dataset):
             :-1
         ]  # remove default eos token
 
-        if (len(src_encoding) > self.seq_len + 2) or (len(tgt_encoding) > self.seq_len + 1):
+        if (len(src_encoding) > self.seq_len) or (len(tgt_encoding) > self.seq_len):
             return
 
         src_padding_len = self.seq_len - (len(src_encoding) + 2)
