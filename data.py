@@ -7,7 +7,7 @@ class WMTDataset(Dataset):
 
     def __init__(self, data_path, src_tokenizer, tgt_tokenizer, seq_len):
         super().__init__()
-        self.data = pd.read_csv(data_path, lineterminator='\n')
+        self.data = pd.read_csv(data_path)
         self.src_vocab_size = src_tokenizer.vocab_size
         self.tgt_vocab_size = tgt_tokenizer.vocab_size
         self.src_tokenizer = src_tokenizer

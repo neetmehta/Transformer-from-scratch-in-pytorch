@@ -41,7 +41,7 @@ def get_dataloaders(config, tokenizer):
     return train_loader, val_loader
 
 
-def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, device):
+def train_one_epoch(model, dataloader, optimizer, criterion, tokenizer, config, epoch, device):
     model.train()
     total_loss = 0.0
     steps = 0
@@ -61,6 +61,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, devi
             src, tgt, enc_self_attn_mask, dec_self_attn_mask, dec_cross_attn_mask
         )
         logits = logits.view(-1, logits.size(-1))
+        
         label = label.view(-1)
 
         loss = criterion(logits, label)
@@ -68,6 +69,19 @@ def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, devi
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        pred_sentence = torch.argmax(logits.softmax(dim=-1), dim=-1)
+        if len(torch.where(pred_sentence==2)[0]) > 0:
+            stop_index = torch.where(pred_sentence==2)[0][0]
+        else:
+            stop_index = pred_sentence.shape[0]
+            
+        if len(torch.where(label==2)[0]) > 0:
+            stop_label_index = torch.where(label==2)[0][0]
+        else:
+            stop_label_index = label.shape[0]
+        print("Pred sentence: \n", tokenizer.decode(pred_sentence[:stop_index].tolist()), "\n")
+        print("Target sentence: \n", tokenizer.decode(label[:stop_label_index].tolist()), "\n")
 
         total_loss += loss.item()
         progress_bar.set_postfix(loss=loss.item())
@@ -147,7 +161,7 @@ def main():
     for epoch in range(start_epoch, config.num_epochs):
         print(f"Epoch {epoch + 1}/{config.num_epochs}")
         avg_loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, config, epoch, device
+            model, train_loader, optimizer, criterion, tokenizer, config, epoch, device
         )
         print(f"Epoch {epoch + 1} Loss: {avg_loss:.4f}\n")
         print(f"Running Validation...")
@@ -155,7 +169,7 @@ def main():
             model, val_loader, criterion, config, tokenizer, device
         )
         print(f"Avg. BLEU score is: {avg_bleu_score}\n")
-        if avg_bleu_score > best_bleu_score:
+        if True:
             print(
                 f"Saving checkpoint... (BLEU score improved from {best_bleu_score:.4f} to {avg_bleu_score:.4f})\n"
             )
