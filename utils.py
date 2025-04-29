@@ -5,8 +5,19 @@ import importlib.util
 import sys
 
 import torchmetrics.text
+import torch
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LambdaLR
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def get_transformer_lr_scheduler(optimizer: Optimizer, d_model: int = 256, warmup_steps: int = 4000):
+    def lr_lambda(step: int):
+        if step == 0:
+            step = 1
+        return (d_model ** -0.5) * min(step ** -0.5, step * (warmup_steps ** -1.5))
+    
+    return LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 
 def load_config(config_path):

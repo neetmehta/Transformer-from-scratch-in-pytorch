@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 from tqdm import tqdm
 import argparse
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, LinearLR
 
 from data import WMTDataset
 from model import build_transformer
@@ -14,6 +15,7 @@ from utils import (
     calculate_bleu_score,
     greedy_decode,
     load_config,
+    get_transformer_lr_scheduler
 )
 
 
@@ -41,7 +43,7 @@ def get_dataloaders(config, tokenizer):
     return train_loader, val_loader
 
 
-def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, device):
+def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, epoch, device):
     model.train()
     total_loss = 0.0
     steps = 0
@@ -67,7 +69,10 @@ def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, devi
 
         optimizer.zero_grad()
         loss.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         optimizer.step()
+        scheduler.step()
 
         total_loss += loss.item()
         progress_bar.set_postfix(loss=loss.item())
@@ -131,8 +136,9 @@ def main():
         ignore_index=pad_token_id, label_smoothing=config.label_smoothing
     )
     optimizer = torch.optim.Adam(
-        model.parameters(), betas=config.betas, eps=config.optim_eps, lr=10**-4
+        model.parameters(), betas=config.betas, eps=config.optim_eps, lr=config.lr
     )
+    scheduler = get_transformer_lr_scheduler(optimizer, d_model=config.d_model, warmup_steps=config.warmup_steps)
 
     print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M\n")
     print("Starting training...")
@@ -147,7 +153,7 @@ def main():
     for epoch in range(start_epoch, config.num_epochs):
         print(f"Epoch {epoch + 1}/{config.num_epochs}")
         avg_loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, config, epoch, device
+            model, train_loader, optimizer, criterion, scheduler, config, epoch, device
         )
         print(f"Epoch {epoch + 1} Loss: {avg_loss:.4f}\n")
         print(f"Running Validation...")

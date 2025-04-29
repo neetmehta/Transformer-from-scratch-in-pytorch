@@ -10,9 +10,9 @@ class Config:
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6
         self.dropout = 0.1
-        self.train_data_path = "E:\Transformer-from-scratch-in-pytorch\wmt14_translate_de-en_train.csv"
-        self.val_data_path = "E:\Transformer-from-scratch-in-pytorch\wmt14_translate_de-en_validation.csv"
-        self.train_batch_size = 16
+        self.train_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_train.csv"
+        self.val_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_validation.csv"
+        self.train_batch_size = 24
         self.val_batch_size = 1
         self.shuffle = True
         self.label_smoothing = 0.1
@@ -24,3 +24,5 @@ class Config:
         self.save_after_steps = 1000
         self.train_workers = 0
         self.val_workers = 0
+        self.lr = 5e-4
+        self.warmup_steps = 4000

@@ -237,9 +237,9 @@ class Transformer(nn.Module):
 
         # Weight tying
         # self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
-        self.src_word_embedding.word_embd.weight = (
-            self.tgt_word_embedding.word_embd.weight
-        )
+        # self.src_word_embedding.word_embd.weight = (
+        #     self.tgt_word_embedding.word_embd.weight
+        # )
 
     def encode(self, src, self_attn_mask):
         src = self.src_word_embedding(src)
