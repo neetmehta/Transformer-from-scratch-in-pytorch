@@ -66,7 +66,7 @@ def greedy_decode(src, src_mask, model, tokenizer, config, device):
         masked_self_attn_mask = generate_causal_mask(pred.shape[1]).to(device)
         cross_attn_mask = torch.ones(
             (1, pred.shape[1]), dtype=bool, device=device
-        ).unsqueeze(0).unsqueeze(3) | src_mask.unsqueeze(2)
+        ).unsqueeze(0).unsqueeze(3) & src_mask.unsqueeze(2)
         decoder_out = model.decode(pred, memory, masked_self_attn_mask, cross_attn_mask)
 
         logits = model.project(decoder_out)
