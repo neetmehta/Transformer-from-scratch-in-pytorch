@@ -9,6 +9,7 @@ class WordEmbeddings(nn.Module):
         super().__init__()
 
         self.word_embd = nn.Embedding(vocab_size, d_model)
+        self.d_model = d_model
 
     def forward(self, tokens):
 
@@ -210,7 +211,7 @@ class ProjectionLayer(nn.Module):
 
     def __init__(self, d_model, vocab_size):
         super().__init__()
-        self.projection = nn.Linear(d_model, vocab_size, bias=False)
+        self.projection = nn.Linear(d_model, vocab_size)
 
     def forward(self, x):
         return self.projection(x)
@@ -235,14 +236,15 @@ class Transformer(nn.Module):
         self.decoder = decoder
         self.projection_layer = projection_layer
 
+        self.init_with_xavier()
         # Weight tying
-        # self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+        self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
         self.src_word_embedding.word_embd.weight = (
             self.tgt_word_embedding.word_embd.weight
         )
 
     def encode(self, src, self_attn_mask):
-        src = self.src_word_embedding(src)
+        src = self.src_word_embedding(src) * math.sqrt(self.src_word_embedding.d_model)
 
         src = self.positional_encoding(src)
 
@@ -274,6 +276,11 @@ class Transformer(nn.Module):
         logits = self.project(decoder_out)
 
         return logits
+    
+    def init_with_xavier(self):
+        for name, p in self.named_parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
 
 def build_transformer(config):
