@@ -83,6 +83,8 @@ def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, 
         if steps % config.save_after_steps == 0:
             print(f"Saving checkpoint... \n")
             print(f"Avg. Loss: {step_loss/config.save_after_steps}")
+            for param_group in optimizer.param_groups:
+                print(f"LR: {param_group['lr']}")
             save_checkpoint(
                 model, optimizer, epoch + 1, total_loss / steps, config.checkpoint_path
             )
