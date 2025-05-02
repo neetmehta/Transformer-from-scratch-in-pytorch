@@ -18,11 +18,11 @@ class Config:
         self.label_smoothing = 0.1
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
-        self.num_epochs = 100
+        self.num_epochs = 2
         self.checkpoint_path = "./best_ckpt_tiny.pth"
         self.resume = False
         self.save_after_steps = 1000
         self.train_workers = 0
         self.val_workers = 0
-        self.lr = 5e-4
-        self.warmup_steps = 4000
+        self.lr = 1
+        self.warmup_steps = 8000

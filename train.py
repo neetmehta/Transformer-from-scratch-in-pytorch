@@ -46,6 +46,7 @@ def get_dataloaders(config, tokenizer):
 def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, epoch, device):
     model.train()
     total_loss = 0.0
+    step_loss = 0.0
     steps = 0
     num_batches = len(dataloader)
 
@@ -77,13 +78,15 @@ def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, 
         total_loss += loss.item()
         progress_bar.set_postfix(loss=loss.item())
         steps += 1
+        step_loss += loss.item()
 
         if steps % config.save_after_steps == 0:
             print(f"Saving checkpoint... \n")
+            print(f"Avg. Loss: {step_loss/config.save_after_steps}")
             save_checkpoint(
                 model, optimizer, epoch + 1, total_loss / steps, config.checkpoint_path
             )
-
+            step_loss = 0.0
     return total_loss / num_batches
 
 
