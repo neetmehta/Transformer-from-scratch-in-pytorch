@@ -12,7 +12,7 @@ class Config:
         self.dropout = 0.1
         self.train_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_train.csv"
         self.val_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_validation.csv"
-        self.train_batch_size = 24
+        self.train_batch_size = 28
         self.val_batch_size = 1
         self.shuffle = True
         self.label_smoothing = 0.1
@@ -20,10 +20,10 @@ class Config:
         self.betas = (0.9, 0.98)
         self.num_epochs = 2
         self.checkpoint_path = "./best_ckpt_tiny.pth"
-        self.resume = False
+        self.resume = True
         self.save_after_steps = 1000
         self.train_workers = 0
         self.val_workers = 0
         self.lr = 1
-        self.warmup_steps = 8000
+        self.warmup_steps = 4000
         self.gradient_accumulation_steps = 4

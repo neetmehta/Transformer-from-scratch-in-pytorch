@@ -78,6 +78,7 @@ def train_one_epoch(
 
         total_loss += loss.item()
         step_loss += loss.item()
+        progress_bar.set_postfix(loss=loss.item())
 
         loss = loss / config.gradient_accumulation_steps
 
@@ -90,7 +91,6 @@ def train_one_epoch(
             scheduler.step()
             optimizer.zero_grad()
 
-        progress_bar.set_postfix(loss=loss.item())
         steps += 1
 
         if steps % config.save_after_steps == 0:
