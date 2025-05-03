@@ -15,7 +15,7 @@ from utils import (
     calculate_bleu_score,
     greedy_decode,
     load_config,
-    get_transformer_lr_scheduler
+    get_transformer_lr_scheduler,
 )
 
 
@@ -34,16 +34,24 @@ def get_dataloaders(config, tokenizer):
     )
 
     train_loader = DataLoader(
-        train_dataset, batch_size=config.train_batch_size, shuffle=config.shuffle, num_workers=config.train_workers
+        train_dataset,
+        batch_size=config.train_batch_size,
+        shuffle=config.shuffle,
+        num_workers=config.train_workers,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=config.val_batch_size, shuffle=False, num_workers=config.val_workers
+        val_dataset,
+        batch_size=config.val_batch_size,
+        shuffle=False,
+        num_workers=config.val_workers,
     )
 
     return train_loader, val_loader
 
 
-def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, epoch, device):
+def train_one_epoch(
+    model, dataloader, optimizer, criterion, scheduler, config, epoch, device
+):
     model.train()
     total_loss = 0.0
     step_loss = 0.0
@@ -68,23 +76,28 @@ def train_one_epoch(model, dataloader, optimizer, criterion, scheduler, config, 
 
         loss = criterion(logits, label)
 
-        optimizer.zero_grad()
+        total_loss += loss.item()
+        step_loss += loss.item()
+
+        loss = loss / config.gradient_accumulation_steps
+
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
-        optimizer.step()
-        scheduler.step()
+        if (steps + 1) % config.gradient_accumulation_steps == 0:
 
-        total_loss += loss.item()
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+
         progress_bar.set_postfix(loss=loss.item())
         steps += 1
-        step_loss += loss.item()
 
         if steps % config.save_after_steps == 0:
             print(f"Saving checkpoint... \n")
             print(f"Avg. Loss: {step_loss/config.save_after_steps}")
-            for param_group in optimizer.param_groups:
-                print(f"LR: {param_group['lr']}")
+
+            print(f"LR: {scheduler.get_last_lr()[0]}")
             save_checkpoint(
                 model, optimizer, epoch + 1, total_loss / steps, config.checkpoint_path
             )
@@ -143,7 +156,9 @@ def main():
     optimizer = torch.optim.Adam(
         model.parameters(), betas=config.betas, eps=config.optim_eps, lr=config.lr
     )
-    scheduler = get_transformer_lr_scheduler(optimizer, d_model=config.d_model, warmup_steps=config.warmup_steps)
+    scheduler = get_transformer_lr_scheduler(
+        optimizer, d_model=config.d_model, warmup_steps=config.warmup_steps
+    )
 
     print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M\n")
     print("Starting training...")

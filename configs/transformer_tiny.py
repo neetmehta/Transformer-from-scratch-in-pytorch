@@ -26,3 +26,4 @@ class Config:
         self.val_workers = 0
         self.lr = 1
         self.warmup_steps = 8000
+        self.gradient_accumulation_steps = 4
