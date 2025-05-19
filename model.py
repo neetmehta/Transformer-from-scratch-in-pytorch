@@ -98,13 +98,13 @@ class MultiheadAttention(nn.Module):
 
 class FeedForwardNetwork(nn.Module):
 
-    def __init__(self, d_model, d_ff, p_d=0.1):
+    def __init__(self, d_model, d_ff, p_d=0.1, bias=True):
         super().__init__()
 
         # p_d = 0.1 from original paper
-        self.linear_1 = nn.Linear(d_model, d_ff)
+        self.linear_1 = nn.Linear(d_model, d_ff, bias=bias)
         self.dropout = nn.Dropout(p_d)
-        self.linear_2 = nn.Linear(d_ff, d_model)
+        self.linear_2 = nn.Linear(d_ff, d_model, bias=bias)
 
     def forward(self, x):
 
@@ -216,39 +216,70 @@ class ProjectionLayer(nn.Module):
     def forward(self, x):
         return self.projection(x)
 
-
 class Transformer(nn.Module):
+
+    def __init__(
+        self,
+        encoder,
+        decoder
+    ):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def encode(self, src, self_attn_mask):
+
+        memory = self.encoder(src, self_attn_mask)
+
+        return memory
+
+    def decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask):
+
+        decoder_out = self.decoder(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+
+        return decoder_out
+
+    def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
+
+        memory = self.encode(src, self_attn_mask)
+
+        decoder_out = self.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+
+        return decoder_out
+
+
+class MachineTranslationModel(nn.Module):
 
     def __init__(
         self,
         src_word_embedding,
         tgt_word_embedding,
         positional_encoding,
-        encoder,
-        decoder,
+        transformer,
         projection_layer,
+        weight_tying=True
     ):
         super().__init__()
         self.src_word_embedding = src_word_embedding
         self.tgt_word_embedding = tgt_word_embedding
+        self.transformer = transformer
         self.positional_encoding = positional_encoding
-        self.encoder = encoder
-        self.decoder = decoder
         self.projection_layer = projection_layer
 
         self.init_with_xavier()
         # Weight tying
-        self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
-        self.src_word_embedding.word_embd.weight = (
-            self.tgt_word_embedding.word_embd.weight
-        )
+        # if weight_tying:
+        #     self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+        #     self.src_word_embedding.word_embd.weight = (
+        #         self.tgt_word_embedding.word_embd.weight
+        #     )
 
     def encode(self, src, self_attn_mask):
         src = self.src_word_embedding(src) * math.sqrt(self.src_word_embedding.d_model)
 
         src = self.positional_encoding(src)
 
-        memory = self.encoder(src, self_attn_mask)
+        memory = self.transformer.encode(src, self_attn_mask)
 
         return memory
 
@@ -257,7 +288,7 @@ class Transformer(nn.Module):
 
         tgt = self.positional_encoding(tgt)
 
-        decoder_out = self.decoder(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+        decoder_out = self.transformer.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
 
         return decoder_out
 
@@ -315,17 +346,18 @@ def build_transformer(config):
     )
 
     decoder = Decoder(decoder_layers)
+    
+    transformer = Transformer(encoder=encoder, decoder=decoder)
 
     # Output Projection
     projection_layer = ProjectionLayer(config.d_model, config.tgt_vocab_size)
 
     # Build Transformer
-    model = Transformer(
+    model = MachineTranslationModel(
         src_word_embedding,
         tgt_word_embedding,
         positional_encoding,
-        encoder,
-        decoder,
+        transformer,
         projection_layer,
     )
 
