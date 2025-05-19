@@ -64,24 +64,24 @@ def generate_causal_mask(seq_len):
     )
 
 
-def greedy_decode(src, src_mask, model, tokenizer, config, device):
+def greedy_decode(src, model, tokenizer, config, device):
 
     model.eval()
     assert src.shape[0] == 1, "batch size 1 is only supported"
-    enc_self_attn_mask = src_mask.unsqueeze(2) | src_mask.unsqueeze(3)
+    src_mask = src == 0
+    src_mask = src_mask.unsqueeze(1).unsqueeze(2)
+    enc_self_attn_mask = src_mask
     memory = model.encode(src, enc_self_attn_mask)
-    sos_token = tokenizer.encode(["<s>"])[0]
-    eos_token = tokenizer.encode(["</s>"])[0]
+    sos_token = tokenizer.encode("[BOS]")[1]
+    eos_token = tokenizer.encode("[EOS]")[1]
 
     pred = torch.tensor([[sos_token]], dtype=torch.long, device=device)
 
     for _ in range(config.max_seq_len):
 
         masked_self_attn_mask = generate_causal_mask(pred.shape[1]).to(device)
-        cross_attn_mask = torch.ones(
-            (1, pred.shape[1]), dtype=bool, device=device
-        ).unsqueeze(0).unsqueeze(3) & src_mask.unsqueeze(2)
-        decoder_out = model.decode(pred, memory, masked_self_attn_mask, cross_attn_mask)
+        
+        decoder_out = model.decode(pred, memory, masked_self_attn_mask, src_mask)
 
         logits = model.project(decoder_out)
 

@@ -1,27 +1,43 @@
 class Config:
     def __init__(self):
-        self.tokenizer = "facebook/wmt19-en-de"
-        self.src_vocab_size = 42025
-        self.tgt_vocab_size = 42025
-        self.seq_len = 200
-        self.d_model = 512
+
+        self.src_vocab_size = 37000
+        self.tgt_vocab_size = 37000
+
+        # Tokenizer
+        self.tokenizer_type = "bpe"
+        self.train_tokenizer = False
+        self.tokenizer_path = "bpe.json"
+
+        # Data
+        self.dataset = "wmt14"
+        self.language = "de-en"
+        self.no_of_samples = 1
+        self.train_batch_size = 1
+        self.val_batch_size = 1
+        self.workers = 0
+        self.pin_memory = True
+
+        # Model
+        self.max_seq_len = 50
+        self.d_model = 256
         self.num_heads = 8
         self.d_ff = 2048
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6
         self.dropout = 0.1
-        self.train_data_path = "E:\Transformer-from-scratch-in-pytorch\overfit.csv"
-        self.val_data_path = "E:\Transformer-from-scratch-in-pytorch\overfit.csv"
-        self.train_batch_size = 1
-        self.val_batch_size = 1
-        self.shuffle = False
+        self.weight_tying = True
+
+        # Optimizer and loss
         self.label_smoothing = 0.1
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
-        self.num_epochs = 30
+        self.lr = 1
+
+        # Training
+        self.num_epochs = 1000
         self.checkpoint_path = "./overfit.pth"
         self.resume = False
         self.save_after_steps = 1000
-        self.train_workers = 8
-        self.val_workers = 8
-
+        self.warmup_steps = 4000
+        self.gradient_accumulation_steps = 1
