@@ -14,9 +14,9 @@ class Config:
         self.language = 'de-en'
 
         # Model
-        self.seq_len = 5
-        self.d_model = 4
-        self.num_heads = 2
+        self.max_seq_len = 500
+        self.d_model = 256
+        self.num_heads = 8
         self.d_ff = 2048
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6

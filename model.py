@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from utils import generate_causal_mask
 
 
 class WordEmbeddings(nn.Module):
@@ -268,11 +269,11 @@ class MachineTranslationModel(nn.Module):
 
         self.init_with_xavier()
         # Weight tying
-        # if weight_tying:
-        #     self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
-        #     self.src_word_embedding.word_embd.weight = (
-        #         self.tgt_word_embedding.word_embd.weight
-        #     )
+        if weight_tying:
+            self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+            self.src_word_embedding.word_embd.weight = (
+                self.tgt_word_embedding.word_embd.weight
+            )
 
     def encode(self, src, self_attn_mask):
         src = self.src_word_embedding(src) * math.sqrt(self.src_word_embedding.d_model)
@@ -284,7 +285,7 @@ class MachineTranslationModel(nn.Module):
         return memory
 
     def decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask):
-        tgt = self.tgt_word_embedding(tgt)
+        tgt = self.tgt_word_embedding(tgt) * math.sqrt(self.tgt_word_embedding.d_model)
 
         tgt = self.positional_encoding(tgt)
 
@@ -298,7 +299,19 @@ class MachineTranslationModel(nn.Module):
 
         return logits
 
-    def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
+    def forward(self, src, tgt):
+        
+        src_mask = (src == 0)
+        
+        tgt_mask = (tgt == 0)
+        
+        causal_mask = generate_causal_mask(tgt.size(1))
+        
+        self_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
+        
+        masked_self_attn_mask = tgt_mask.unsqueeze(1).unsqueeze(2) | causal_mask
+        
+        cross_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
 
         memory = self.encode(src, self_attn_mask)
 
@@ -321,7 +334,7 @@ def build_transformer(config):
     tgt_word_embedding = WordEmbeddings(config.tgt_vocab_size, config.d_model)
 
     # Shared Positional Embedding
-    positional_encoding = PositionalEmbedding(config.seq_len, config.d_model)
+    positional_encoding = PositionalEmbedding(config.max_seq_len, config.d_model)
 
     # Stack of Encoder Layers
     encoder_layers = nn.ModuleList(
