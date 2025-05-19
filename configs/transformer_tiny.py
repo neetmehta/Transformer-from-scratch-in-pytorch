@@ -1,15 +1,26 @@
 class Config:
     def __init__(self):
-        self.tokenizer = "facebook/wmt19-en-de"
-        self.src_vocab_size = 42025
-        self.tgt_vocab_size = 42025
-        self.seq_len = 400
-        self.d_model = 256
-        self.num_heads = 8
+        
+        self.src_vocab_size = 37000
+        self.tgt_vocab_size = 37000
+        
+        # Tokenizer
+        self.tokenizer_type = "bpe"
+        self.train_tokenizer = False
+        self.tokenizer_path = 'bpe.json'
+        
+        # Data
+        self.dataset = 'wmt14'
+        self.language = 'de-en'
+
+        # Model
+        self.seq_len = 5
+        self.d_model = 4
+        self.num_heads = 2
         self.d_ff = 2048
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6
-        self.dropout = 0.1
+        self.dropout = 0.0
         self.train_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_train.csv"
         self.val_data_path = "/root/.cache/kagglehub/datasets/mohamedlotfy50/wmt-2014-english-german/versions/1/wmt14_translate_de-en_validation.csv"
         self.train_batch_size = 28
