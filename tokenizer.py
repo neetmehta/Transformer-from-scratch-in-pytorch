@@ -8,11 +8,13 @@ from tokenizers.processors import TemplateProcessing
 from transformers import PreTrainedTokenizerFast
 from torch.nn.utils.rnn import pad_sequence
 
+
 def batch_iterator(data, batch_size=100000):
     for i in range(0, len(data), batch_size):
-        yield data[i : i + batch_size]['translation_src']
+        yield data[i : i + batch_size]["translation_src"]
     for i in range(0, len(data), batch_size):
-        yield data[i : i + batch_size]['translation_trg']
+        yield data[i : i + batch_size]["translation_tgt"]
+
 
 class TokenizerWrapper:
 
@@ -20,8 +22,10 @@ class TokenizerWrapper:
         self.cfg = config
 
         if self.cfg.train_tokenizer:
-            assert self.cfg.tokenizer_type in ['bpe', 'wordlevel'], \
-                "Tokenizer type must be either 'bpe' or 'wordlevel'"
+            assert self.cfg.tokenizer_type in [
+                "bpe",
+                "wordlevel",
+            ], "Tokenizer type must be either 'bpe' or 'wordlevel'"
             assert data is not None, "Data must be provided for training"
 
             batches = batch_iterator(data, batch_size=10000)
@@ -30,7 +34,7 @@ class TokenizerWrapper:
             self.tokenizer = self.load_tokenizer(self.cfg.tokenizer_path)
 
     def train_tokenizer(self, data_iterator):
-        if self.cfg.tokenizer_type == 'bpe':
+        if self.cfg.tokenizer_type == "bpe":
             return self.train_bpe_tokenizer(data_iterator)
         else:
             return self.train_word_level_tokenizer(data_iterator)
@@ -39,14 +43,14 @@ class TokenizerWrapper:
         return self._train_tokenizer_core(
             model=BPE(unk_token="[UNK]"),
             trainer_cls=BpeTrainer,
-            data_iterator=data_iterator
+            data_iterator=data_iterator,
         )
 
     def train_word_level_tokenizer(self, data_iterator):
         return self._train_tokenizer_core(
             model=WordLevel(unk_token="[UNK]"),
             trainer_cls=WordLevelTrainer,
-            data_iterator=data_iterator
+            data_iterator=data_iterator,
         )
 
     def _train_tokenizer_core(self, model, trainer_cls, data_iterator):
@@ -57,8 +61,7 @@ class TokenizerWrapper:
         tokenizer.decoder = ByteLevelDecoder()
 
         trainer = trainer_cls(
-            special_tokens=special_tokens,
-            vocab_size=self.cfg.vocab_size
+            special_tokens=special_tokens, vocab_size=self.cfg.vocab_size
         )
 
         tokenizer.train_from_iterator(data_iterator, trainer=trainer)
@@ -75,22 +78,21 @@ class TokenizerWrapper:
         if self.cfg.tokenizer_path:
             tokenizer.save(self.cfg.tokenizer_path)
 
-        return PreTrainedTokenizerFast(tokenizer_object=tokenizer, pad_token='[PAD]')
+        return PreTrainedTokenizerFast(tokenizer_object=tokenizer, pad_token="[PAD]")
 
     def encode(self, text):
         return self.tokenizer.encode(text)
 
     def decode(self, tokens):
         return self.tokenizer.decode(tokens)
-    
+
     def batch_decode(self, tokens):
         return self.tokenizer.batch_decode(tokens)
-    
+
     def batch_encode(self, texts):
         return self.tokenizer.batch_encode_plus(texts)
 
     def load_tokenizer(self, file_path):
         tokenizer = PreTrainedTokenizerFast(tokenizer_file=file_path)
-        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        tokenizer.add_special_tokens({"pad_token": "[PAD]"})
         return tokenizer
-

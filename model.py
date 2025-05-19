@@ -217,13 +217,10 @@ class ProjectionLayer(nn.Module):
     def forward(self, x):
         return self.projection(x)
 
+
 class Transformer(nn.Module):
 
-    def __init__(
-        self,
-        encoder,
-        decoder
-    ):
+    def __init__(self, encoder, decoder):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -258,7 +255,7 @@ class MachineTranslationModel(nn.Module):
         positional_encoding,
         transformer,
         projection_layer,
-        weight_tying=True
+        weight_tying=True,
     ):
         super().__init__()
         self.src_word_embedding = src_word_embedding
@@ -270,7 +267,9 @@ class MachineTranslationModel(nn.Module):
         self.init_with_xavier()
         # Weight tying
         if weight_tying:
-            self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
+            self.projection_layer.projection.weight = (
+                self.tgt_word_embedding.word_embd.weight
+            )
             self.src_word_embedding.word_embd.weight = (
                 self.tgt_word_embedding.word_embd.weight
             )
@@ -289,7 +288,9 @@ class MachineTranslationModel(nn.Module):
 
         tgt = self.positional_encoding(tgt)
 
-        decoder_out = self.transformer.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+        decoder_out = self.transformer.decode(
+            tgt, memory, masked_self_attn_mask, cross_attn_mask
+        )
 
         return decoder_out
 
@@ -300,17 +301,17 @@ class MachineTranslationModel(nn.Module):
         return logits
 
     def forward(self, src, tgt):
-        
-        src_mask = (src == 0)
-        
-        tgt_mask = (tgt == 0)
-        
+
+        src_mask = src == 0
+
+        tgt_mask = tgt == 0
+
         causal_mask = generate_causal_mask(tgt.size(1))
-        
+
         self_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
-        
+
         masked_self_attn_mask = tgt_mask.unsqueeze(1).unsqueeze(2) | causal_mask
-        
+
         cross_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
 
         memory = self.encode(src, self_attn_mask)
@@ -320,7 +321,7 @@ class MachineTranslationModel(nn.Module):
         logits = self.project(decoder_out)
 
         return logits
-    
+
     def init_with_xavier(self):
         for name, p in self.named_parameters():
             if p.dim() > 1:
@@ -359,7 +360,7 @@ def build_transformer(config):
     )
 
     decoder = Decoder(decoder_layers)
-    
+
     transformer = Transformer(encoder=encoder, decoder=decoder)
 
     # Output Projection
