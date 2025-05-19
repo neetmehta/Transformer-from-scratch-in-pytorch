@@ -1,9 +1,9 @@
 import torch
 import random
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 from datasets import load_dataset
-from tokenizer import *
+from torch.nn.utils.rnn import pad_sequence
 
 
 def map_dataset(data, tokenizer):
@@ -22,15 +22,17 @@ def map_dataset(data, tokenizer):
 
 
 def pad_collate_fn(batch):
-    src_sentences, tgt_sentences = [], []
+    src_sentences, tgt_sentences, label_sentences = [], [], []
     for sample in batch:
         src_sentences += [sample[0]]
         tgt_sentences += [sample[1]]
+        label_sentences += [sample[2]]
 
     src_sentences = pad_sequence(src_sentences, batch_first=True, padding_value=0)
     tgt_sentences = pad_sequence(tgt_sentences, batch_first=True, padding_value=0)
+    label_sentences = pad_sequence(label_sentences, batch_first=True, padding_value=0)
 
-    return src_sentences, tgt_sentences
+    return src_sentences, tgt_sentences, label_sentences
 
 
 def prepare_data(dataset):
@@ -46,9 +48,10 @@ class WMTENDE(Dataset):
         super().__init__()
         data = (
             load_dataset(config.dataset, config.language, split=split)
-            .shuffle(seed=42)
-            .select(range(config.no_of_samples))
-        )
+            .shuffle(seed=42))
+        
+        if split=='train':
+            data = data.select(range(config.no_of_samples))
         data = prepare_data(data)
         self.data = (
             map_dataset(data, tokenizer)
@@ -63,9 +66,18 @@ class WMTENDE(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        return torch.tensor(
-            self.data[index]["translation_src_tokens"], dtype=torch.long
-        ), torch.tensor(self.data[index]["translation_tgt_tokens"], dtype=torch.long)
+        return (
+            torch.tensor(
+                self.data[index]["translation_src_tokens"], dtype=torch.long
+            ),  # src
+            torch.tensor(
+                self.data[index]["translation_tgt_tokens"][:-1], dtype=torch.long  # tgt
+            ),
+            torch.tensor(
+                self.data[index]["translation_tgt_tokens"][1:],
+                dtype=torch.long,  # label
+            ),
+        )
 
 
 class CustomBatchSampler(Sampler):
@@ -82,3 +94,28 @@ class CustomBatchSampler(Sampler):
 
     def __iter__(self):
         return iter(self.indices)
+
+
+def get_dataloaders(config, tokenizer):
+    train_dataset = WMTENDE(config, tokenizer, split="train")
+    val_dataset = WMTENDE(config, tokenizer, split="validation")
+
+    train_sampler = CustomBatchSampler(len(train_dataset), config.train_batch_size)
+    val_sampler = CustomBatchSampler(len(val_dataset), config.val_batch_size)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_sampler=train_sampler,
+        collate_fn=pad_collate_fn,
+        num_workers=config.workers,
+        pin_memory=config.pin_memory,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_sampler=val_sampler,
+        collate_fn=pad_collate_fn,
+        num_workers=config.workers,
+        pin_memory=config.pin_memory,
+    )
+
+    return train_loader, val_loader

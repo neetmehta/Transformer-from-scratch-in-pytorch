@@ -306,7 +306,7 @@ class MachineTranslationModel(nn.Module):
 
         tgt_mask = tgt == 0
 
-        causal_mask = generate_causal_mask(tgt.size(1))
+        causal_mask = generate_causal_mask(tgt.size(1)).to(tgt_mask.device)
 
         self_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
 
@@ -373,6 +373,7 @@ def build_transformer(config):
         positional_encoding,
         transformer,
         projection_layer,
+        weight_tying=config.weight_tying
     )
 
     return model

@@ -6,7 +6,8 @@ from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.normalizers import NFKC
 from tokenizers.processors import TemplateProcessing
 from transformers import PreTrainedTokenizerFast
-from torch.nn.utils.rnn import pad_sequence
+from data import prepare_data
+from datasets import load_dataset, concatenate_datasets
 
 
 def batch_iterator(data, batch_size=100000):
@@ -96,3 +97,9 @@ class TokenizerWrapper:
         tokenizer = PreTrainedTokenizerFast(tokenizer_file=file_path)
         tokenizer.add_special_tokens({"pad_token": "[PAD]"})
         return tokenizer
+
+def train_tokenizer(config):
+    dataset = load_dataset(config.dataset, config.language)
+    dataset = concatenate_datasets([dataset["train"], dataset["validation"], dataset["test"]])
+    dataset = prepare_data(dataset)
+    return TokenizerWrapper(config, dataset)

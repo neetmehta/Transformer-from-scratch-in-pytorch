@@ -4,9 +4,9 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 from tqdm import tqdm
 import argparse
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, LinearLR
+from tokenizer import TokenizerWrapper, train_tokenizer
 
-from data import WMTDataset
+from data import get_dataloaders
 from model import build_transformer
 from utils import (
     generate_causal_mask,
@@ -17,36 +17,6 @@ from utils import (
     load_config,
     get_transformer_lr_scheduler,
 )
-
-
-def get_dataloaders(config, tokenizer):
-    train_dataset = WMTDataset(
-        data_path=config.train_data_path,
-        src_tokenizer=tokenizer,
-        tgt_tokenizer=tokenizer,
-        seq_len=config.seq_len,
-    )
-    val_dataset = WMTDataset(
-        data_path=config.val_data_path,
-        src_tokenizer=tokenizer,
-        tgt_tokenizer=tokenizer,
-        seq_len=config.seq_len,
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.train_batch_size,
-        shuffle=config.shuffle,
-        num_workers=config.train_workers,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.val_batch_size,
-        shuffle=False,
-        num_workers=config.val_workers,
-    )
-
-    return train_loader, val_loader
 
 
 def train_one_epoch(
@@ -61,16 +31,10 @@ def train_one_epoch(
     progress_bar = tqdm(dataloader, desc="Training", leave=False)
 
     for batch in progress_bar:
-        src, tgt, label, src_mask, tgt_mask = [x.to(device) for x in batch]
+        src, tgt, label = [x.to(device) for x in batch]
 
-        enc_self_attn_mask = src_mask.unsqueeze(2) | src_mask.unsqueeze(3)
-        causal_mask = generate_causal_mask(config.seq_len).to(device)
-        dec_self_attn_mask = tgt_mask.unsqueeze(2) | tgt_mask.unsqueeze(3) | causal_mask
-        dec_cross_attn_mask = tgt_mask.unsqueeze(3) | src_mask.unsqueeze(2)
-
-        logits = model(
-            src, tgt, enc_self_attn_mask, dec_self_attn_mask, dec_cross_attn_mask
-        )
+        # TODO: Left and right shift of tgt
+        logits = model(src, tgt)
         logits = logits.view(-1, logits.size(-1))
         label = label.view(-1)
 
@@ -112,7 +76,7 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
 
     progress_bar = tqdm(dataloader, desc="Validation", leave=False)
     for batch in progress_bar:
-        src, _, label, src_mask, _ = [x.to(device) for x in batch]
+        src, tgt, label = [x.to(device) for x in batch]
         logits, prediction = greedy_decode(
             src, src_mask, model, tokenizer, config, device
         )
@@ -141,15 +105,17 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer)
-    tokenizer.add_special_tokens({"bos_token": "<s>"})
+    if config.train_tokenizer:
+        tokenizer = train_tokenizer(config)
+    else:
+        tokenizer = TokenizerWrapper(config)
 
     train_loader, val_loader = get_dataloaders(config, tokenizer)
 
     model = build_transformer(config)
     model.to(device)
 
-    pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
+    pad_token_id = 0  # TODO: Remove hardcoding
     criterion = nn.CrossEntropyLoss(
         ignore_index=pad_token_id, label_smoothing=config.label_smoothing
     )

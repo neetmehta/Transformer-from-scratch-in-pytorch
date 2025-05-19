@@ -13,10 +13,10 @@ class Config:
         self.dataset = "wmt14"
         self.language = "de-en"
         self.no_of_samples = 10000
-        self.train_batch_size = 28
+        self.train_batch_size = 4
         self.val_batch_size = 1
-        self.train_workers = 0
-        self.val_workers = 0
+        self.workers = 0
+        self.pin_memory = True
 
         # Model
         self.max_seq_len = 500
@@ -25,7 +25,8 @@ class Config:
         self.d_ff = 2048
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6
-        self.dropout = 0.0
+        self.dropout = 0.1
+        self.weight_tying = True
 
         # Optimizer and loss
         self.label_smoothing = 0.1
