@@ -125,7 +125,9 @@ def main():
         optimizer, d_model=config.d_model, warmup_steps=config.warmup_steps
     )
 
-    print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M\n")
+    print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M")
+    print(f"Training data size: {len(train_loader.dataset)}")
+    print(f"Validation data size: {len(val_loader.dataset)}\n")
     print("Starting training...")
 
     if config.resume:

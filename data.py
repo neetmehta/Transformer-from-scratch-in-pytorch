@@ -44,14 +44,14 @@ def prepare_data(dataset):
 
 class WMTENDE(Dataset):
 
-    def __init__(self, config, tokenizer, split="train"):
+    def __init__(self, config, tokenizer, no_of_samples, split="train"):
         super().__init__()
-        data = (
-            load_dataset(config.dataset, config.language, split=split)
-            .shuffle(seed=42))
-        
-        if split=='train':
-            data = data.select(range(config.no_of_samples))
+        data = load_dataset(config.dataset, config.language, split=split).shuffle(
+            seed=42
+        )
+
+        if no_of_samples != -1:
+            data = data.select(range(no_of_samples))
         data = prepare_data(data)
         self.data = (
             map_dataset(data, tokenizer)
@@ -97,8 +97,12 @@ class CustomBatchSampler(Sampler):
 
 
 def get_dataloaders(config, tokenizer):
-    train_dataset = WMTENDE(config, tokenizer, split="train")
-    val_dataset = WMTENDE(config, tokenizer, split="validation")
+    train_dataset = WMTENDE(
+        config, tokenizer, no_of_samples=config.train_samples, split="train"
+    )
+    val_dataset = WMTENDE(
+        config, tokenizer, no_of_samples=config.val_samples, split="validation"
+    )
 
     train_sampler = CustomBatchSampler(len(train_dataset), config.train_batch_size)
     val_sampler = CustomBatchSampler(len(val_dataset), config.val_batch_size)
@@ -110,12 +114,17 @@ def get_dataloaders(config, tokenizer):
         num_workers=config.workers,
         pin_memory=config.pin_memory,
     )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_sampler=val_sampler,
-        collate_fn=pad_collate_fn,
-        num_workers=config.workers,
-        pin_memory=config.pin_memory,
-    )
 
-    return train_loader, val_loader
+    if config.overfit:
+        return train_loader, train_loader
+
+    else:
+        val_loader = DataLoader(
+            val_dataset,
+            batch_sampler=val_sampler,
+            collate_fn=pad_collate_fn,
+            num_workers=config.workers,
+            pin_memory=config.pin_memory,
+        )
+
+        return train_loader, val_loader

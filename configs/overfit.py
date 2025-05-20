@@ -12,20 +12,21 @@ class Config:
         # Data
         self.dataset = "wmt14"
         self.language = "de-en"
-        self.no_of_samples = 1
-        self.train_batch_size = 1
+        self.train_samples = 1
+        self.val_samples = 1
+        self.train_batch_size = 24
         self.val_batch_size = 1
         self.workers = 0
         self.pin_memory = True
 
         # Model
-        self.max_seq_len = 50
+        self.max_seq_len = 500
         self.d_model = 256
         self.num_heads = 8
         self.d_ff = 2048
         self.num_encoder_layers = 6
         self.num_decoder_layers = 6
-        self.dropout = 0.1
+        self.dropout = 0.0
         self.weight_tying = True
 
         # Optimizer and loss
@@ -35,9 +36,10 @@ class Config:
         self.lr = 1
 
         # Training
-        self.num_epochs = 1000
+        self.num_epochs = 2
         self.checkpoint_path = "./overfit.pth"
-        self.resume = False
+        self.resume = True
         self.save_after_steps = 1000
         self.warmup_steps = 4000
-        self.gradient_accumulation_steps = 1
+        self.gradient_accumulation_steps = 4
+        self.overfit = True

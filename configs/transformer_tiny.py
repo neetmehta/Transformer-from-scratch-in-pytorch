@@ -12,14 +12,15 @@ class Config:
         # Data
         self.dataset = "wmt14"
         self.language = "de-en"
-        self.no_of_samples = 10000
-        self.train_batch_size = 4
+        self.train_samples = -1
+        self.val_samples = 20
+        self.train_batch_size = 64
         self.val_batch_size = 1
         self.workers = 0
         self.pin_memory = True
 
         # Model
-        self.max_seq_len = 500
+        self.max_seq_len = 50
         self.d_model = 256
         self.num_heads = 8
         self.d_ff = 2048
@@ -37,7 +38,8 @@ class Config:
         # Training
         self.num_epochs = 2
         self.checkpoint_path = "./best_ckpt_tiny.pth"
-        self.resume = True
+        self.resume = False
         self.save_after_steps = 1000
         self.warmup_steps = 4000
         self.gradient_accumulation_steps = 4
+        self.overfit = False

@@ -100,6 +100,6 @@ class TokenizerWrapper:
 
 def train_tokenizer(config):
     dataset = load_dataset(config.dataset, config.language)
-    dataset = concatenate_datasets([dataset["train"], dataset["validation"], dataset["test"]])
     dataset = prepare_data(dataset)
+    dataset = concatenate_datasets([dataset["train"], dataset["validation"], dataset["test"]])
     return TokenizerWrapper(config, dataset)
