@@ -2,10 +2,12 @@ class Config:
     def __init__(self):
 
         self.vocab_size = 60_000
+        self.src_vocab_size = 60_000
+        self.tgt_vocab_size = 60_000
 
         # Tokenizer
         self.tokenizer_type = "bpe"
-        self.train_tokenizer = True
+        self.train_tokenizer = False
         self.tokenizer_path = "bpe.json"
 
         # Data
