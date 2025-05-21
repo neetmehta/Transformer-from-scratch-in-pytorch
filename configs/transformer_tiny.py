@@ -1,12 +1,12 @@
 class Config:
     def __init__(self):
 
-        self.src_vocab_size = 37000
-        self.tgt_vocab_size = 37000
+        self.src_vocab_size = 60000
+        self.tgt_vocab_size = 60000
 
         # Tokenizer
         self.tokenizer_type = "bpe"
-        self.train_tokenizer = False
+        self.train_tokenizer = True
         self.tokenizer_path = "bpe.json"
 
         # Data
@@ -33,12 +33,12 @@ class Config:
         self.label_smoothing = 0.1
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
-        self.lr = 1
+        self.lr = 0.1
 
         # Training
-        self.num_epochs = 2
+        self.num_epochs = 20
         self.checkpoint_path = "./best_ckpt_tiny.pth"
-        self.resume = False
+        self.resume = True
         self.save_after_steps = 1000
         self.warmup_steps = 4000
         self.gradient_accumulation_steps = 4
