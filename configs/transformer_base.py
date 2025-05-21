@@ -1,8 +1,7 @@
 class Config:
     def __init__(self):
 
-        self.src_vocab_size = 60_000
-        self.tgt_vocab_size = 60_000
+        self.vocab_size = 60_000
 
         # Tokenizer
         self.tokenizer_type = "bpe"
