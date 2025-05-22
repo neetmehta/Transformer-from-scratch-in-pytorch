@@ -13,15 +13,15 @@ class Config:
         # Data
         self.dataset = "wmt19"
         self.language = "de-en"
-        self.train_samples = 12_000_000
-        self.val_samples = 2000
+        self.train_samples = -1
+        self.val_samples = -1
         self.train_batch_size = 128
         self.val_batch_size = 1
-        self.workers = 8
+        self.workers = 12
         self.pin_memory = True
 
         # Model
-        self.max_seq_len = 70
+        self.max_seq_len = 100
         self.d_model = 512
         self.num_heads = 8
         self.d_ff = 2048
