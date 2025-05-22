@@ -34,13 +34,13 @@ class Config:
         self.label_smoothing = 0.1
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
-        self.lr = 0.05
+        self.lr = 0.1
 
         # Training
         self.num_epochs = 3
         self.checkpoint_path = "./best_ckpt_base.pth"
-        self.resume = False
+        self.resume = True
         self.save_after_steps = 1000
         self.warmup_steps = 4000
-        self.gradient_accumulation_steps = 8
+        self.gradient_accumulation_steps = 4
         self.overfit = False

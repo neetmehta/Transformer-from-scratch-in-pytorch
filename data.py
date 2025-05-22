@@ -6,7 +6,7 @@ from datasets import load_dataset
 from torch.nn.utils.rnn import pad_sequence
 
 
-def map_dataset(data, tokenizer):
+def map_dataset(data, tokenizer, workers=0):
     # Do not flatten/rename here if already done in TokenizerWrapper
     def map_example(example):
         src_encoded = tokenizer.batch_encode(example["translation_src"])
@@ -18,7 +18,7 @@ def map_dataset(data, tokenizer):
         example["tgt_len"] = [len(ids) for ids in tgt_encoded["input_ids"]]
         return example
 
-    return data.map(map_example, batched=True, batch_size=1000)
+    return data.map(map_example, batched=True, batch_size=1000, num_proc=workers)
 
 
 def pad_collate_fn(batch):
@@ -54,11 +54,12 @@ class WMTENDE(Dataset):
             data = data.select(range(no_of_samples))
         data = prepare_data(data)
         self.data = (
-            map_dataset(data, tokenizer)
+            map_dataset(data, tokenizer, workers=config.workers)
             .sort("src_len")
             .filter(
                 lambda x: x["src_len"] < config.max_seq_len
-                and x["tgt_len"] < config.max_seq_len
+                and x["tgt_len"] < config.max_seq_len,
+                num_proc=config.workers
             )
         )
 
