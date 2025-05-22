@@ -13,15 +13,15 @@ class Config:
         # Data
         self.dataset = "wmt19"
         self.language = "de-en"
-        self.train_samples = 4_500_000
-        self.val_samples = 20
-        self.train_batch_size = 32
+        self.train_samples = 12_000_000
+        self.val_samples = 2000
+        self.train_batch_size = 128
         self.val_batch_size = 1
-        self.workers = 4
+        self.workers = 8
         self.pin_memory = True
 
         # Model
-        self.max_seq_len = 50
+        self.max_seq_len = 70
         self.d_model = 512
         self.num_heads = 8
         self.d_ff = 2048
@@ -34,13 +34,13 @@ class Config:
         self.label_smoothing = 0.1
         self.optim_eps = 1e-9
         self.betas = (0.9, 0.98)
-        self.lr = 0.1
+        self.lr = 0.05
 
         # Training
-        self.num_epochs = 20
+        self.num_epochs = 3
         self.checkpoint_path = "./best_ckpt_base.pth"
-        self.resume = True
+        self.resume = False
         self.save_after_steps = 1000
         self.warmup_steps = 4000
-        self.gradient_accumulation_steps = 4
+        self.gradient_accumulation_steps = 8
         self.overfit = False
