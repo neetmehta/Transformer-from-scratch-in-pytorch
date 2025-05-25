@@ -43,11 +43,12 @@ def save_checkpoint(model, optimizer, epoch, loss, path):
     )
 
 
-def load_checkpoint(model, optimizer, path):
+def load_checkpoint(model, optimizer=None, path=""):
     if os.path.isfile(path):
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if optimizer is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch = checkpoint["epoch"]
         best_loss = checkpoint["loss"]
         print(f"Loaded checkpoint from epoch {start_epoch} with loss {best_loss:.4f}")
