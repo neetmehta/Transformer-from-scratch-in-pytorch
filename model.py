@@ -5,20 +5,32 @@ from utils import generate_causal_mask
 
 
 class WordEmbeddings(nn.Module):
+    """Word Embedding layer for the Transformer model.
+    This module creates an embedding layer for the input tokens, mapping them to a higher-dimensional space.
+    Args:
+        vocab_size (int): Size of the vocabulary.
+        d_model (int): Dimension of the model (embedding size).
+    """
 
     def __init__(self, vocab_size, d_model):
         super().__init__()
 
-        self.word_embd = nn.Embedding(vocab_size, d_model)
-        self.d_model = d_model
+        self.word_embd = nn.Embedding(vocab_size, d_model)  # Embedding layer
+        self.d_model = d_model  # Dimension of the model
 
     def forward(self, tokens):
 
-        x = self.word_embd(tokens)
-        return x
+        x = self.word_embd(tokens)  # tokens -> (B, seq_len)
+        return x  # x -> (B, seq_len, d_model)
 
 
 class PositionalEmbedding(nn.Module):
+    """Positional Encoding layer for the Transformer model.
+    This module adds positional encodings to the input embeddings to provide information about the position of tokens in the sequence.
+    Args:
+        seq_len (int): Length of the input sequence.
+        d_model (int): Dimension of the model (embedding size).
+    """
 
     def __init__(self, seq_len, d_model):
         super().__init__()
@@ -33,10 +45,17 @@ class PositionalEmbedding(nn.Module):
 
     def forward(self, x):
 
-        return x + self.pe[:, : x.shape[1], :]
+        # add positional encoding to the input tensor x
+        return x + self.pe[:, : x.shape[1], :]  # x -> (B, seq_len, d_model)
 
 
 class MultiheadAttention(nn.Module):
+    """Multi-head Attention layer for the Transformer model.
+    This module implements multi-head attention mechanism, allowing the model to focus on different parts of the input sequence.
+    Args:
+        d_model (int): Dimension of the model (embedding size).
+        num_heads (int): Number of attention heads.
+    """
 
     def __init__(self, d_model, num_heads):
         super().__init__()
@@ -54,7 +73,7 @@ class MultiheadAttention(nn.Module):
 
     def forward(self, q, k, v, mask=None):
 
-        B, seq_len, embd_dim = q.shape
+        B, seq_len, _ = q.shape
         # q -> (B, seq_len, embd_dim)
         # k -> (B, seq_len, embd_dim)
         # v -> (B, seq_len, embd_dim)
@@ -98,6 +117,14 @@ class MultiheadAttention(nn.Module):
 
 
 class FeedForwardNetwork(nn.Module):
+    """Feed Forward Network layer for the Transformer model.
+    This module implements a feed-forward network with two linear layers and a ReLU activation in between.
+    Args:
+        d_model (int): Dimension of the model (embedding size).
+        d_ff (int): Dimension of the feed-forward network.
+        p_d (float): Dropout probability for the dropout layer.
+        bias (bool): Whether to use bias in the linear layers.
+    """
 
     def __init__(self, d_model, d_ff, p_d=0.1, bias=True):
         super().__init__()
@@ -115,6 +142,17 @@ class FeedForwardNetwork(nn.Module):
 
 
 class EncoderBlock(nn.Module):
+    """Single Encoder Block for the Transformer model.
+    Consists of a multi-head self-attention layer followed by a feed-forward network,
+    each with residual connections and layer normalization.
+    Args:
+        d_model (int): Dimension of the model (embedding size).
+        num_heads (int): Number of attention heads.
+        d_ff (int): Dimension of the feed-forward network.
+        p_d (float): Dropout probability.
+        layer_norm_eps (float): Epsilon for layer normalization.
+        bias (bool): Whether to use bias in the linear layers.
+    """
 
     def __init__(
         self, d_model, num_heads, d_ff, p_d=0.1, layer_norm_eps=1e-5, bias=True
@@ -143,6 +181,17 @@ class EncoderBlock(nn.Module):
 
 
 class DecoderBlock(nn.Module):
+    """Single Decoder Block for the Transformer model.
+    Consists of a masked multi-head self-attention layer, a multi-head cross-attention layer,
+    and a feed-forward network, each with residual connections and layer normalization.
+    Args:
+        d_model (int): Dimension of the model (embedding size).
+        num_heads (int): Number of attention heads.
+        d_ff (int): Dimension of the feed-forward network.
+        p_d (float): Dropout probability.
+        layer_norm_eps (float): Epsilon for layer normalization.
+        bias (bool): Whether to use bias in the linear layers.
+    """
 
     def __init__(
         self, d_model, num_heads, d_ff, p_d=0.0, layer_norm_eps=1e-5, bias=True
@@ -187,6 +236,12 @@ class DecoderBlock(nn.Module):
 
 
 class Encoder(nn.Module):
+    """Encoder stack for the Transformer model.
+    Applies a sequence of EncoderBlock layers to the input.
+    Args:
+        encoder_layers (nn.ModuleList): List of EncoderBlock layers.
+    """
+
     def __init__(self, encoder_layers):
         super().__init__()
         self.encoder_layers = encoder_layers
@@ -198,6 +253,12 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
+    """Decoder stack for the Transformer model.
+    Applies a sequence of DecoderBlock layers to the input.
+    Args:
+        decoder_layers (nn.ModuleList): List of DecoderBlock layers.
+    """
+
     def __init__(self, decoder_layers):
         super().__init__()
         self.decoder_layers = decoder_layers
@@ -209,6 +270,12 @@ class Decoder(nn.Module):
 
 
 class ProjectionLayer(nn.Module):
+    """Projection layer for the Transformer model.
+    Projects the decoder output to the vocabulary size for prediction.
+    Args:
+        d_model (int): Dimension of the model (embedding size).
+        vocab_size (int): Size of the vocabulary.
+    """
 
     def __init__(self, d_model, vocab_size):
         super().__init__()
@@ -219,6 +286,12 @@ class ProjectionLayer(nn.Module):
 
 
 class Transformer(nn.Module):
+    """Transformer model consisting of an encoder and a decoder.
+    Provides methods for encoding, decoding, and full forward pass.
+    Args:
+        encoder (Encoder): Encoder stack.
+        decoder (Decoder): Decoder stack.
+    """
 
     def __init__(self, encoder, decoder):
         super().__init__()
@@ -247,6 +320,17 @@ class Transformer(nn.Module):
 
 
 class MachineTranslationModel(nn.Module):
+    """Full Machine Translation model using the Transformer architecture.
+    Combines embeddings, positional encoding, transformer, and output projection.
+    Supports weight tying between embeddings and projection layer.
+    Args:
+        src_word_embedding (WordEmbeddings): Source language embedding layer.
+        tgt_word_embedding (WordEmbeddings): Target language embedding layer.
+        positional_encoding (PositionalEmbedding): Positional encoding layer.
+        transformer (Transformer): Transformer model.
+        projection_layer (ProjectionLayer): Output projection layer.
+        weight_tying (bool): Whether to tie weights between embeddings and projection.
+    """
 
     def __init__(
         self,
@@ -323,13 +407,18 @@ class MachineTranslationModel(nn.Module):
         return logits
 
     def init_with_xavier(self):
-        for name, p in self.named_parameters():
+        for _, p in self.named_parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
 
 def build_transformer(config):
-
+    """Builds a complete Transformer-based machine translation model from a configuration object.
+    Args:
+        config: Configuration object with model hyperparameters.
+    Returns:
+        MachineTranslationModel: The constructed model.
+    """
     # Word Embeddings
     src_word_embedding = WordEmbeddings(config.src_vocab_size, config.d_model)
     tgt_word_embedding = WordEmbeddings(config.tgt_vocab_size, config.d_model)

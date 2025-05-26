@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from transformers import AutoTokenizer
 from tqdm import tqdm
 import argparse
 from tokenizer import TokenizerWrapper, train_tokenizer
@@ -9,7 +7,6 @@ from tokenizer import TokenizerWrapper, train_tokenizer
 from data import get_dataloaders
 from model import build_transformer
 from utils import (
-    generate_causal_mask,
     save_checkpoint,
     load_checkpoint,
     calculate_bleu_score,
@@ -22,6 +19,19 @@ from utils import (
 def train_one_epoch(
     model, dataloader, optimizer, criterion, scheduler, config, epoch, device
 ):
+    """Train the model for one epoch.
+    Args:
+        model (nn.Module): The model to train.
+        dataloader (DataLoader): DataLoader for the training data.
+        optimizer (Optimizer): Optimizer for updating model parameters.
+        criterion (nn.Module): Loss function.
+        scheduler (Scheduler): Learning rate scheduler.
+        config (Config): Configuration object containing training settings.
+        epoch (int): Current epoch number.
+        device (torch.device): Device to run the training on (CPU or GPU).
+    Returns:
+        float: Average loss for the epoch.
+    """
     model.train()
     total_loss = 0.0
     step_loss = 0.0
@@ -33,7 +43,6 @@ def train_one_epoch(
     for batch in progress_bar:
         src, tgt, label = [x.to(device) for x in batch]
 
-        # TODO: Left and right shift of tgt
         logits = model(src, tgt)
         logits = logits.view(-1, logits.size(-1))
         label = label.view(-1)
@@ -70,6 +79,17 @@ def train_one_epoch(
 
 
 def validate(model, dataloader, criterion, config, tokenizer, device):
+    """Validate the model on the validation set.
+    Args:
+        model (nn.Module): The model to validate.
+        dataloader (DataLoader): DataLoader for the validation data.
+        criterion (nn.Module): Loss function.
+        config (Config): Configuration object containing validation settings.
+        tokenizer (TokenizerWrapper): Tokenizer for decoding predictions.
+        device (torch.device): Device to run the validation on (CPU or GPU).
+    Returns:
+        float: Average BLEU score for the validation set.
+    """
     model.eval()
     total_bleu_score = 0.0
     num_batches = len(dataloader)
@@ -77,13 +97,12 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
     progress_bar = tqdm(dataloader, desc="Validation", leave=False)
     for batch in progress_bar:
         src, _, label = [x.to(device) for x in batch]
-        logits, prediction = greedy_decode(src, model, tokenizer, config, device)
+        _, prediction = greedy_decode(src, model, tokenizer, config, device)
         pad_token, eos_token = (
             tokenizer.encode(tokenizer.tokenizer.pad_token)[1],
             tokenizer.encode(tokenizer.tokenizer.pad_token)[2],
         )
 
-        # TODO: Remove hardcoding for eos
         raw_label = label[(label != pad_token) & (label != eos_token)]
         raw_label = tokenizer.decode(raw_label.tolist())
         bleu_score = calculate_bleu_score(raw_label, prediction, "bleu_score")
@@ -94,6 +113,7 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
 
 
 def main():
+    """Main function to train and validate the transformer model."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config", type=str, required=True, help="Path to the config file"

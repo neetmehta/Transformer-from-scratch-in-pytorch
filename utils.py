@@ -15,6 +15,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def get_transformer_lr_scheduler(
     optimizer: Optimizer, d_model: int = 256, warmup_steps: int = 4000
 ):
+    """Returns a learning rate scheduler with the schedule from the original Transformer paper.
+    Args:
+        optimizer (Optimizer): The optimizer to apply the schedule to.
+        d_model (int): The model dimension.
+        warmup_steps (int): Number of warmup steps.
+    Returns:
+        LambdaLR: Learning rate scheduler.
+    """
     def lr_lambda(step: int):
         if step == 0:
             step = 1
@@ -24,6 +32,12 @@ def get_transformer_lr_scheduler(
 
 
 def load_config(config_path):
+    """Dynamically loads a Python config file as a module.
+    Args:
+        config_path (str): Path to the config .py file.
+    Returns:
+        module: The loaded config module.
+    """
     spec = importlib.util.spec_from_file_location("config_module", config_path)
     config_module = importlib.util.module_from_spec(spec)
     sys.modules["config_module"] = config_module
@@ -32,6 +46,14 @@ def load_config(config_path):
 
 
 def save_checkpoint(model, optimizer, epoch, loss, path):
+    """Saves model and optimizer state to a checkpoint file.
+    Args:
+        model (nn.Module): The model to save.
+        optimizer (Optimizer): The optimizer to save.
+        epoch (int): Current epoch number.
+        loss (float): Current loss value.
+        path (str): Path to save the checkpoint.
+    """
     torch.save(
         {
             "epoch": epoch,
@@ -44,6 +66,14 @@ def save_checkpoint(model, optimizer, epoch, loss, path):
 
 
 def load_checkpoint(model, optimizer=None, path=""):
+    """Loads model and optimizer state from a checkpoint file.
+    Args:
+        model (nn.Module): The model to load state into.
+        optimizer (Optimizer, optional): The optimizer to load state into.
+        path (str): Path to the checkpoint file.
+    Returns:
+        tuple: (start_epoch, best_loss)
+    """
     if os.path.isfile(path):
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint["model_state_dict"])
@@ -57,6 +87,12 @@ def load_checkpoint(model, optimizer=None, path=""):
 
 
 def generate_causal_mask(seq_len):
+    """Generates a causal mask for sequence-to-sequence models.
+    Args:
+        seq_len (int): Length of the sequence.
+    Returns:
+        torch.Tensor: Causal mask of shape (1, 1, seq_len, seq_len).
+    """
     return (
         torch.triu(torch.ones((seq_len, seq_len)), diagonal=1)
         .unsqueeze(0)
@@ -66,7 +102,16 @@ def generate_causal_mask(seq_len):
 
 
 def greedy_decode(src, model, tokenizer, config, device):
-
+    """Performs greedy decoding for sequence generation.
+    Args:
+        src (torch.Tensor): Source sequence tensor of shape (1, src_seq_len).
+        model (nn.Module): The machine translation model.
+        tokenizer: Tokenizer with encode and decode methods.
+        config: Configuration object with max_seq_len.
+        device: Device to run the model on.
+    Returns:
+        tuple: (logits, decoded_sentence)
+    """
     model.eval()
     assert src.shape[0] == 1, "batch size 1 is only supported"
     src_mask = src == 0
@@ -99,6 +144,14 @@ def greedy_decode(src, model, tokenizer, config, device):
 
 
 def calculate_bleu_score(label, pred, metric_name):
+    """Calculates BLEU score for a predicted sentence.
+    Args:
+        label (str): Reference sentence.
+        pred (str): Predicted sentence.
+        metric_name (str): Name of the metric ("bleu_score").
+    Returns:
+        float: BLEU score.
+    """
     if metric_name == "bleu_score":
         metrics = torchmetrics.text.BLEUScore()
         score = metrics([pred], [[label]])
