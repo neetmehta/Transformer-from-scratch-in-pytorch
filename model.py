@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from utils import generate_causal_mask
 
 
 class WordEmbeddings(nn.Module):
@@ -9,6 +10,7 @@ class WordEmbeddings(nn.Module):
         super().__init__()
 
         self.word_embd = nn.Embedding(vocab_size, d_model)
+        self.d_model = d_model
 
     def forward(self, tokens):
 
@@ -97,13 +99,13 @@ class MultiheadAttention(nn.Module):
 
 class FeedForwardNetwork(nn.Module):
 
-    def __init__(self, d_model, d_ff, p_d=0.1):
+    def __init__(self, d_model, d_ff, p_d=0.1, bias=True):
         super().__init__()
 
         # p_d = 0.1 from original paper
-        self.linear_1 = nn.Linear(d_model, d_ff)
+        self.linear_1 = nn.Linear(d_model, d_ff, bias=bias)
         self.dropout = nn.Dropout(p_d)
-        self.linear_2 = nn.Linear(d_ff, d_model)
+        self.linear_2 = nn.Linear(d_ff, d_model, bias=bias)
 
     def forward(self, x):
 
@@ -210,7 +212,7 @@ class ProjectionLayer(nn.Module):
 
     def __init__(self, d_model, vocab_size):
         super().__init__()
-        self.projection = nn.Linear(d_model, vocab_size, bias=False)
+        self.projection = nn.Linear(d_model, vocab_size)
 
     def forward(self, x):
         return self.projection(x)
@@ -218,44 +220,77 @@ class ProjectionLayer(nn.Module):
 
 class Transformer(nn.Module):
 
-    def __init__(
-        self,
-        src_word_embedding,
-        tgt_word_embedding,
-        positional_encoding,
-        encoder,
-        decoder,
-        projection_layer,
-    ):
+    def __init__(self, encoder, decoder):
         super().__init__()
-        self.src_word_embedding = src_word_embedding
-        self.tgt_word_embedding = tgt_word_embedding
-        self.positional_encoding = positional_encoding
         self.encoder = encoder
         self.decoder = decoder
-        self.projection_layer = projection_layer
-
-        # Weight tying
-        # self.projection_layer.projection.weight = self.tgt_word_embedding.word_embd.weight
-        self.src_word_embedding.word_embd.weight = (
-            self.tgt_word_embedding.word_embd.weight
-        )
 
     def encode(self, src, self_attn_mask):
-        src = self.src_word_embedding(src)
-
-        src = self.positional_encoding(src)
 
         memory = self.encoder(src, self_attn_mask)
 
         return memory
 
     def decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask):
-        tgt = self.tgt_word_embedding(tgt)
+
+        decoder_out = self.decoder(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+
+        return decoder_out
+
+    def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
+
+        memory = self.encode(src, self_attn_mask)
+
+        decoder_out = self.decode(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+
+        return decoder_out
+
+
+class MachineTranslationModel(nn.Module):
+
+    def __init__(
+        self,
+        src_word_embedding,
+        tgt_word_embedding,
+        positional_encoding,
+        transformer,
+        projection_layer,
+        weight_tying=True,
+    ):
+        super().__init__()
+        self.src_word_embedding = src_word_embedding
+        self.tgt_word_embedding = tgt_word_embedding
+        self.transformer = transformer
+        self.positional_encoding = positional_encoding
+        self.projection_layer = projection_layer
+
+        self.init_with_xavier()
+        # Weight tying
+        if weight_tying:
+            self.projection_layer.projection.weight = (
+                self.tgt_word_embedding.word_embd.weight
+            )
+            self.src_word_embedding.word_embd.weight = (
+                self.tgt_word_embedding.word_embd.weight
+            )
+
+    def encode(self, src, self_attn_mask):
+        src = self.src_word_embedding(src) * math.sqrt(self.src_word_embedding.d_model)
+
+        src = self.positional_encoding(src)
+
+        memory = self.transformer.encode(src, self_attn_mask)
+
+        return memory
+
+    def decode(self, tgt, memory, masked_self_attn_mask, cross_attn_mask):
+        tgt = self.tgt_word_embedding(tgt) * math.sqrt(self.tgt_word_embedding.d_model)
 
         tgt = self.positional_encoding(tgt)
 
-        decoder_out = self.decoder(tgt, memory, masked_self_attn_mask, cross_attn_mask)
+        decoder_out = self.transformer.decode(
+            tgt, memory, masked_self_attn_mask, cross_attn_mask
+        )
 
         return decoder_out
 
@@ -265,7 +300,19 @@ class Transformer(nn.Module):
 
         return logits
 
-    def forward(self, src, tgt, self_attn_mask, masked_self_attn_mask, cross_attn_mask):
+    def forward(self, src, tgt):
+
+        src_mask = src == 0
+
+        tgt_mask = tgt == 0
+
+        causal_mask = generate_causal_mask(tgt.size(1)).to(tgt_mask.device)
+
+        self_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
+
+        masked_self_attn_mask = tgt_mask.unsqueeze(1).unsqueeze(2) | causal_mask
+
+        cross_attn_mask = src_mask.unsqueeze(1).unsqueeze(2)
 
         memory = self.encode(src, self_attn_mask)
 
@@ -275,6 +322,11 @@ class Transformer(nn.Module):
 
         return logits
 
+    def init_with_xavier(self):
+        for name, p in self.named_parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
 
 def build_transformer(config):
 
@@ -283,7 +335,7 @@ def build_transformer(config):
     tgt_word_embedding = WordEmbeddings(config.tgt_vocab_size, config.d_model)
 
     # Shared Positional Embedding
-    positional_encoding = PositionalEmbedding(config.seq_len, config.d_model)
+    positional_encoding = PositionalEmbedding(config.max_seq_len, config.d_model)
 
     # Stack of Encoder Layers
     encoder_layers = nn.ModuleList(
@@ -309,17 +361,19 @@ def build_transformer(config):
 
     decoder = Decoder(decoder_layers)
 
+    transformer = Transformer(encoder=encoder, decoder=decoder)
+
     # Output Projection
     projection_layer = ProjectionLayer(config.d_model, config.tgt_vocab_size)
 
     # Build Transformer
-    model = Transformer(
+    model = MachineTranslationModel(
         src_word_embedding,
         tgt_word_embedding,
         positional_encoding,
-        encoder,
-        decoder,
+        transformer,
         projection_layer,
+        weight_tying=config.weight_tying
     )
 
     return model

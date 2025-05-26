@@ -1,65 +1,131 @@
 import torch
-from torch.utils.data import Dataset
-import pandas as pd
-from random import randint
+import random
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import Sampler
+from datasets import load_dataset
+from torch.nn.utils.rnn import pad_sequence
 
-class WMTDataset(Dataset):
 
-    def __init__(self, data_path, src_tokenizer, tgt_tokenizer, seq_len):
+def map_dataset(data, tokenizer, workers=0):
+    # Do not flatten/rename here if already done in TokenizerWrapper
+    def map_example(example):
+        src_encoded = tokenizer.batch_encode(example["translation_src"])
+        tgt_encoded = tokenizer.batch_encode(example["translation_tgt"])
+
+        example["translation_src_tokens"] = src_encoded["input_ids"]
+        example["translation_tgt_tokens"] = tgt_encoded["input_ids"]
+        example["src_len"] = [len(ids) for ids in src_encoded["input_ids"]]
+        example["tgt_len"] = [len(ids) for ids in tgt_encoded["input_ids"]]
+        return example
+
+    return data.map(map_example, batched=True, batch_size=1000, num_proc=workers)
+
+
+def pad_collate_fn(batch):
+    src_sentences, tgt_sentences, label_sentences = [], [], []
+    for sample in batch:
+        src_sentences += [sample[0]]
+        tgt_sentences += [sample[1]]
+        label_sentences += [sample[2]]
+
+    src_sentences = pad_sequence(src_sentences, batch_first=True, padding_value=0)
+    tgt_sentences = pad_sequence(tgt_sentences, batch_first=True, padding_value=0)
+    label_sentences = pad_sequence(label_sentences, batch_first=True, padding_value=0)
+
+    return src_sentences, tgt_sentences, label_sentences
+
+
+def prepare_data(dataset):
+    dataset = dataset.flatten()
+    dataset = dataset.rename_column("translation.de", "translation_tgt")
+    dataset = dataset.rename_column("translation.en", "translation_src")
+    return dataset
+
+
+class WMTENDE(Dataset):
+
+    def __init__(self, config, tokenizer, no_of_samples, split="train"):
         super().__init__()
-        self.data = pd.read_csv(data_path, lineterminator='\n')
-        self.src_vocab_size = src_tokenizer.vocab_size
-        self.tgt_vocab_size = tgt_tokenizer.vocab_size
-        self.src_tokenizer = src_tokenizer
-        self.tgt_tokenizer = tgt_tokenizer
-        self.seq_len = seq_len
+        data = load_dataset(config.dataset, config.language, split=split).shuffle(
+            seed=42
+        )
+
+        if no_of_samples != -1:
+            data = data.select(range(no_of_samples))
+        data = prepare_data(data)
+        self.data = (
+            map_dataset(data, tokenizer, workers=config.workers)
+            .sort("src_len")
+            .filter(
+                lambda x: x["src_len"] < config.max_seq_len
+                and x["tgt_len"] < config.max_seq_len,
+                num_proc=config.workers
+            )
+        )
 
     def __len__(self):
         return len(self.data)
-    
-    def get_sample(self, index):
-        sos_token = self.src_tokenizer.encode(["<s>"])[0]
-        eos_token = self.src_tokenizer.encode(["</s>"])[0]
-        pad_token = self.src_tokenizer.encode(["<pad>"])[0]
-        src_encoding = self.src_tokenizer.encode(self.data.iloc[index]["en"])[
-            :-1
-        ]  # remove default eos token
-        tgt_encoding = self.tgt_tokenizer.encode(self.data.iloc[index]["de"])[
-            :-1
-        ]  # remove default eos token
-
-        if (len(src_encoding) > self.seq_len) or (len(tgt_encoding) > self.seq_len):
-            return
-
-        src_padding_len = self.seq_len - (len(src_encoding) + 2)
-        tgt_padding_len = self.seq_len - (len(tgt_encoding) + 1)
-
-        src_encoding = torch.tensor(
-            [sos_token] + src_encoding + [eos_token] + [pad_token] * src_padding_len,
-            dtype=torch.long,
-        )
-        label = torch.tensor(
-            tgt_encoding + [eos_token] + [pad_token] * tgt_padding_len, dtype=torch.long
-        )
-        tgt_encoding = torch.tensor(
-            [sos_token] + tgt_encoding + [pad_token] * tgt_padding_len, dtype=torch.long
-        )
-
-        src_mask = (src_encoding == pad_token).unsqueeze(0)
-        tgt_mask = (tgt_encoding == pad_token).unsqueeze(0)
-
-        return src_encoding, tgt_encoding, label, src_mask, tgt_mask
-
 
     def __getitem__(self, index):
-        out = self.get_sample(index)
-        
-        if out is None:
-            while True:
-                index = randint(0, len(self.data))
-                out = self.get_sample(index)
-                
-                if out is not None:
-                    return self.get_sample(index)
-                
-        return out
+        return (
+            torch.tensor(
+                self.data[index]["translation_src_tokens"], dtype=torch.long
+            ),  # src
+            torch.tensor(
+                self.data[index]["translation_tgt_tokens"][:-1], dtype=torch.long  # tgt
+            ),
+            torch.tensor(
+                self.data[index]["translation_tgt_tokens"][1:],
+                dtype=torch.long,  # label
+            ),
+        )
+
+
+class CustomBatchSampler(Sampler):
+
+    def __init__(self, data_len, batch_size):
+        self.indices = torch.arange(data_len, dtype=torch.long)
+        self.indices = list(torch.split(self.indices, batch_size))
+        self.indices = [i.tolist() for i in self.indices]
+        random.shuffle(self.indices)
+        self.len = data_len
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __iter__(self):
+        return iter(self.indices)
+
+
+def get_dataloaders(config, tokenizer):
+    train_dataset = WMTENDE(
+        config, tokenizer, no_of_samples=config.train_samples, split="train"
+    )
+    val_dataset = WMTENDE(
+        config, tokenizer, no_of_samples=config.val_samples, split="validation"
+    )
+
+    train_sampler = CustomBatchSampler(len(train_dataset), config.train_batch_size)
+    val_sampler = CustomBatchSampler(len(val_dataset), config.val_batch_size)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_sampler=train_sampler,
+        collate_fn=pad_collate_fn,
+        num_workers=config.workers,
+        pin_memory=config.pin_memory,
+    )
+
+    if config.overfit:
+        return train_loader, train_loader
+
+    else:
+        val_loader = DataLoader(
+            val_dataset,
+            batch_sampler=val_sampler,
+            collate_fn=pad_collate_fn,
+            num_workers=config.workers,
+            pin_memory=config.pin_memory,
+        )
+
+        return train_loader, val_loader

@@ -5,8 +5,22 @@ import importlib.util
 import sys
 
 import torchmetrics.text
+import torch
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LambdaLR
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def get_transformer_lr_scheduler(
+    optimizer: Optimizer, d_model: int = 256, warmup_steps: int = 4000
+):
+    def lr_lambda(step: int):
+        if step == 0:
+            step = 1
+        return (d_model**-0.5) * min(step**-0.5, step * (warmup_steps**-1.5))
+
+    return LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 
 def load_config(config_path):
@@ -29,11 +43,12 @@ def save_checkpoint(model, optimizer, epoch, loss, path):
     )
 
 
-def load_checkpoint(model, optimizer, path):
+def load_checkpoint(model, optimizer=None, path=""):
     if os.path.isfile(path):
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if optimizer is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch = checkpoint["epoch"]
         best_loss = checkpoint["loss"]
         print(f"Loaded checkpoint from epoch {start_epoch} with loss {best_loss:.4f}")
@@ -50,24 +65,24 @@ def generate_causal_mask(seq_len):
     )
 
 
-def greedy_decode(src, src_mask, model, tokenizer, config, device):
+def greedy_decode(src, model, tokenizer, config, device):
 
     model.eval()
     assert src.shape[0] == 1, "batch size 1 is only supported"
-    enc_self_attn_mask = src_mask.unsqueeze(2) | src_mask.unsqueeze(3)
+    src_mask = src == 0
+    src_mask = src_mask.unsqueeze(1).unsqueeze(2)
+    enc_self_attn_mask = src_mask
     memory = model.encode(src, enc_self_attn_mask)
-    sos_token = tokenizer.encode(["<s>"])[0]
-    eos_token = tokenizer.encode(["</s>"])[0]
+    sos_token = tokenizer.encode("[BOS]")[1]
+    eos_token = tokenizer.encode("[EOS]")[1]
 
     pred = torch.tensor([[sos_token]], dtype=torch.long, device=device)
 
-    for _ in range(config.seq_len):
+    for _ in range(config.max_seq_len):
 
         masked_self_attn_mask = generate_causal_mask(pred.shape[1]).to(device)
-        cross_attn_mask = torch.ones(
-            (1, pred.shape[1]), dtype=bool, device=device
-        ).unsqueeze(0).unsqueeze(3) & src_mask.unsqueeze(2)
-        decoder_out = model.decode(pred, memory, masked_self_attn_mask, cross_attn_mask)
+        
+        decoder_out = model.decode(pred, memory, masked_self_attn_mask, src_mask)
 
         logits = model.project(decoder_out)
 
