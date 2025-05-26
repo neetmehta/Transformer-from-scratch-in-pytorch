@@ -4,8 +4,9 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 from tqdm import tqdm
 import argparse
+from tokenizer import TokenizerWrapper, train_tokenizer
 
-from data import WMTDataset
+from data import get_dataloaders
 from model import build_transformer
 from utils import (
     generate_causal_mask,
@@ -14,71 +15,57 @@ from utils import (
     calculate_bleu_score,
     greedy_decode,
     load_config,
+    get_transformer_lr_scheduler,
 )
 
 
-def get_dataloaders(config, tokenizer):
-    train_dataset = WMTDataset(
-        data_path=config.train_data_path,
-        src_tokenizer=tokenizer,
-        tgt_tokenizer=tokenizer,
-        seq_len=config.seq_len,
-    )
-    val_dataset = WMTDataset(
-        data_path=config.val_data_path,
-        src_tokenizer=tokenizer,
-        tgt_tokenizer=tokenizer,
-        seq_len=config.seq_len,
-    )
-
-    train_loader = DataLoader(
-        train_dataset, batch_size=config.train_batch_size, shuffle=config.shuffle, num_workers=config.train_workers
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=config.val_batch_size, shuffle=False, num_workers=config.val_workers
-    )
-
-    return train_loader, val_loader
-
-
-def train_one_epoch(model, dataloader, optimizer, criterion, config, epoch, device):
+def train_one_epoch(
+    model, dataloader, optimizer, criterion, scheduler, config, epoch, device
+):
     model.train()
     total_loss = 0.0
+    step_loss = 0.0
     steps = 0
     num_batches = len(dataloader)
 
     progress_bar = tqdm(dataloader, desc="Training", leave=False)
 
     for batch in progress_bar:
-        src, tgt, label, src_mask, tgt_mask = [x.to(device) for x in batch]
+        src, tgt, label = [x.to(device) for x in batch]
 
-        enc_self_attn_mask = src_mask.unsqueeze(2) | src_mask.unsqueeze(3)
-        causal_mask = generate_causal_mask(config.seq_len).to(device)
-        dec_self_attn_mask = tgt_mask.unsqueeze(2) | tgt_mask.unsqueeze(3) | causal_mask
-        dec_cross_attn_mask = tgt_mask.unsqueeze(3) | src_mask.unsqueeze(2)
-
-        logits = model(
-            src, tgt, enc_self_attn_mask, dec_self_attn_mask, dec_cross_attn_mask
-        )
+        # TODO: Left and right shift of tgt
+        logits = model(src, tgt)
         logits = logits.view(-1, logits.size(-1))
         label = label.view(-1)
 
         loss = criterion(logits, label)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
         total_loss += loss.item()
+        step_loss += loss.item()
         progress_bar.set_postfix(loss=loss.item())
+
+        loss = loss / config.gradient_accumulation_steps
+
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+        if (steps + 1) % config.gradient_accumulation_steps == 0:
+
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+
         steps += 1
 
         if steps % config.save_after_steps == 0:
             print(f"Saving checkpoint... \n")
+            print(f"Avg. Loss: {step_loss/config.save_after_steps}")
+
+            print(f"LR: {scheduler.get_last_lr()[0]}")
             save_checkpoint(
                 model, optimizer, epoch + 1, total_loss / steps, config.checkpoint_path
             )
-
+            step_loss = 0.0
     return total_loss / num_batches
 
 
@@ -89,15 +76,14 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
 
     progress_bar = tqdm(dataloader, desc="Validation", leave=False)
     for batch in progress_bar:
-        src, _, label, src_mask, _ = [x.to(device) for x in batch]
+        src, _, label = [x.to(device) for x in batch]
         logits, prediction = greedy_decode(
-            src, src_mask, model, tokenizer, config, device
+            src, model, tokenizer, config, device
         )
-        pad_token = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
-        eos_token = tokenizer.convert_tokens_to_ids(tokenizer.eos_token)
+        pad_token, eos_token = tokenizer.encode(tokenizer.tokenizer.pad_token)[1], tokenizer.encode(tokenizer.tokenizer.pad_token)[2]
 
         # TODO: Remove hardcoding for eos
-        raw_label = label[(label != pad_token) & (label != 2)]
+        raw_label = label[(label != pad_token) & (label != eos_token)]
         raw_label = tokenizer.decode(raw_label.tolist())
         bleu_score = calculate_bleu_score(raw_label, prediction, "bleu_score")
         total_bleu_score += bleu_score
@@ -118,23 +104,30 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer)
-    tokenizer.add_special_tokens({"bos_token": "<s>"})
+    if config.train_tokenizer:
+        tokenizer = train_tokenizer(config)
+    else:
+        tokenizer = TokenizerWrapper(config)
 
     train_loader, val_loader = get_dataloaders(config, tokenizer)
 
     model = build_transformer(config)
     model.to(device)
 
-    pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
+    pad_token_id = 0  # TODO: Remove hardcoding
     criterion = nn.CrossEntropyLoss(
         ignore_index=pad_token_id, label_smoothing=config.label_smoothing
     )
     optimizer = torch.optim.Adam(
-        model.parameters(), betas=config.betas, eps=config.optim_eps, lr=10**-4
+        model.parameters(), betas=config.betas, eps=config.optim_eps, lr=config.lr
+    )
+    scheduler = get_transformer_lr_scheduler(
+        optimizer, d_model=config.d_model, warmup_steps=config.warmup_steps
     )
 
-    print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M\n")
+    print(f"Number of parameters = {sum(i.numel() for i in model.parameters())/1e6}M")
+    print(f"Training data size: {len(train_loader.dataset)}")
+    print(f"Validation data size: {len(val_loader.dataset)}\n")
     print("Starting training...")
 
     if config.resume:
@@ -147,7 +140,7 @@ def main():
     for epoch in range(start_epoch, config.num_epochs):
         print(f"Epoch {epoch + 1}/{config.num_epochs}")
         avg_loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, config, epoch, device
+            model, train_loader, optimizer, criterion, scheduler, config, epoch, device
         )
         print(f"Epoch {epoch + 1} Loss: {avg_loss:.4f}\n")
         print(f"Running Validation...")
