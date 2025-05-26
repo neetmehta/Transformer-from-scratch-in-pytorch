@@ -98,6 +98,7 @@ class TokenizerWrapper:
         tokenizer.add_special_tokens({"pad_token": "[PAD]"})
         return tokenizer
 
+
 def train_tokenizer(config):
     dataset = load_dataset(config.dataset, config.language)
     dataset = prepare_data(dataset)

@@ -77,10 +77,11 @@ def validate(model, dataloader, criterion, config, tokenizer, device):
     progress_bar = tqdm(dataloader, desc="Validation", leave=False)
     for batch in progress_bar:
         src, _, label = [x.to(device) for x in batch]
-        logits, prediction = greedy_decode(
-            src, model, tokenizer, config, device
+        logits, prediction = greedy_decode(src, model, tokenizer, config, device)
+        pad_token, eos_token = (
+            tokenizer.encode(tokenizer.tokenizer.pad_token)[1],
+            tokenizer.encode(tokenizer.tokenizer.pad_token)[2],
         )
-        pad_token, eos_token = tokenizer.encode(tokenizer.tokenizer.pad_token)[1], tokenizer.encode(tokenizer.tokenizer.pad_token)[2]
 
         # TODO: Remove hardcoding for eos
         raw_label = label[(label != pad_token) & (label != eos_token)]

@@ -81,7 +81,7 @@ def greedy_decode(src, model, tokenizer, config, device):
     for _ in range(config.max_seq_len):
 
         masked_self_attn_mask = generate_causal_mask(pred.shape[1]).to(device)
-        
+
         decoder_out = model.decode(pred, memory, masked_self_attn_mask, src_mask)
 
         logits = model.project(decoder_out)

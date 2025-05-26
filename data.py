@@ -59,7 +59,7 @@ class WMTENDE(Dataset):
             .filter(
                 lambda x: x["src_len"] < config.max_seq_len
                 and x["tgt_len"] < config.max_seq_len,
-                num_proc=config.workers
+                num_proc=config.workers,
             )
         )
 

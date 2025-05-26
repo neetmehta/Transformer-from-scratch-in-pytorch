@@ -373,7 +373,7 @@ def build_transformer(config):
         positional_encoding,
         transformer,
         projection_layer,
-        weight_tying=config.weight_tying
+        weight_tying=config.weight_tying,
     )
 
     return model
