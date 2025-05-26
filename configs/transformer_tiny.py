@@ -1,8 +1,9 @@
 class Config:
     def __init__(self):
 
-        self.src_vocab_size = 60000
-        self.tgt_vocab_size = 60000
+        self.vocab_size = 60_000
+        self.src_vocab_size = 60_000
+        self.tgt_vocab_size = 60_000
 
         # Tokenizer
         self.tokenizer_type = "bpe"
@@ -10,13 +11,13 @@ class Config:
         self.tokenizer_path = "bpe.json"
 
         # Data
-        self.dataset = "wmt14"
+        self.dataset = "wmt19"
         self.language = "de-en"
         self.train_samples = -1
-        self.val_samples = 20
-        self.train_batch_size = 64
+        self.val_samples = -1
+        self.train_batch_size = 128
         self.val_batch_size = 1
-        self.workers = 0
+        self.workers = 12
         self.pin_memory = True
 
         # Model
